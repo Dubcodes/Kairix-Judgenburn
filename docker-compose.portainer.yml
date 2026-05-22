@@ -15,7 +15,7 @@ services:
 
   web:
     build:
-      context: /home/mainuser/kairix-judgenburn-system
+      context: .
       dockerfile: Dockerfile
     image: kairix-judging-web:local
     environment:
@@ -30,8 +30,8 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - /home/mainuser/kairix-judgenburn-system/app:/app/app
-      - /home/mainuser/kairix-judgenburn-system/backups:/app/backups
+      - ./app:/app/app
+      - ./backups:/app/backups
     restart: unless-stopped
 
   tunnel:
