@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Graphics Control</title>
+    <link rel="icon" href="/static/kairix-judging-system-logo.png">
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <main class="page wide">
+      <div class="topline">
+        <div class="brand-block">
+          <div class="brand-row">
+            <img class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
+            <div class="brand">Graphics Control</div>
+          </div>
+          <div id="who" class="muted"></div>
+        </div>
+        <div class="btn-row">
+          <a class="btn" href="/obs-overlay" data-help="Open the OBS browser overlay in this tab.">Open Overlay</a>
+          <a class="btn" href="/gfx-settings" data-help="Open setup controls for layout, hotkeys, and layer styling.">Settings</a>
+          <a class="btn high-admin-link" href="/admin" data-help="Go to the event control dashboard. High-admin and owner only.">Event Control</a>
+          <a class="btn" href="/" data-help="Return to the open landing page.">Home</a>
+        </div>
+      </div>
+
+      <section class="gfx-control-shell">
+        <aside class="card gfx-live-panel">
+          <h2>Live State</h2>
+          <div class="gfx-current-title" id="live-current">No current competitor</div>
+          <div id="live-up-next" class="muted">Up next loading</div>
+          <div id="live-delay" class="muted">No active delay</div>
+          <div id="live-timer" class="timer-readout">00:00</div>
+          <div class="active-layer-summary" id="active-summary">No layers active</div>
+        </aside>
+
+        <section class="card">
+          <div class="section-head">
+            <div>
+              <h2>Layers</h2>
+              <p class="muted">Click a layer to show or hide it on the OBS overlay.</p>
+            </div>
+            <button id="clear-all" class="btn danger compact" data-help="Hide every graphics layer. Manual message text is kept so it can be shown again.">Clear All</button>
+          </div>
+          <div id="layer-panel" class="layer-panel"></div>
+        </section>
+
+        <section class="card">
+          <h2>Manual Message</h2>
+          <textarea id="message" placeholder="Lunch break - back soon"></textarea>
+          <div class="manual-row">
+            <label class="check"><input id="message-large" type="checkbox" checked> Large text</label>
+            <div class="btn-row">
+              <button id="show-message" class="btn primary" data-help="Show the typed message. If it is already live, hide it without clearing the text.">Toggle Message</button>
+              <button id="hide-message" class="btn" data-help="Hide the manual message layer but keep the typed text ready.">Hide Message</button>
+              <button id="clear-message" class="btn" data-help="Clear the typed manual message and hide only the manual message layer.">Clear Message</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="card section-gap-md">
+        <div class="section-head">
+          <div>
+            <h2>Feature Competitor</h2>
+            <p class="muted">Up Next follows the real queue unless you manually feature someone here.</p>
+          </div>
+          <button id="clear-featured" class="btn compact" data-help="Clear the manual Up Next choice so the overlay uses the actual next competitor in queue.">Use Actual Up Next</button>
+        </div>
+        <div id="feature-list" class="vertical-list compact-list"></div>
+      </section>
+    </main>
+
+    <script src="/static/js/common.js?v=20260505-logo-layers"></script>
+    <script>
+      const gfxSession = Kairix.requireRole(["graphics", "high_admin", "owner"]);
+      Kairix.validateSession(gfxSession, ["graphics", "high_admin", "owner"]).catch(() => {});
+      const roleDisplay = role => ({ admin: "Event Control", high_admin: "Admin", owner: "High Admin / Owner", graphics: "Graphics" }[role] || role);
+      document.getElementById("who").textContent = `${gfxSession.display_name} / ${roleDisplay(gfxSession.role)}`;
+      if (gfxSession.role === "graphics") {
+        document.querySelectorAll(".high-admin-link").forEach(item => item.style.display = "none");
+      }
+
+      const layerDefs = [
+        { id: "current_competitor", label: "Current", defaultKey: "C", desc: "Show or hide the current competitor lower third." },
+        { id: "up_next", label: "Up Next", defaultKey: "U", desc: "Show or hide the actual next competitor, or the manually featured competitor if one is selected." },
+        { id: "delay", label: "Delay", defaultKey: "D", desc: "Show or hide the active delay banner." },
+        { id: "judge_likeness", label: "Judge Heat", defaultKey: "J", desc: "Show or hide the live judge heat meter." },
+        { id: "timer", label: "Timer", defaultKey: "T", desc: "Show or hide the official run timer." },
+        { id: "manual_message", label: "Message", defaultKey: "M", desc: "Show or hide the manual message layer." },
+        { id: "logo", label: "Logo", defaultKey: "L", desc: "Show or hide the PNG logo layer. Opacity changes automatically when it is the only live layer." },
+        { id: "leaderboard_full", label: "Leaderboard Full", defaultKey: "F", desc: "Show or hide the centered full leaderboard layer." },
+        { id: "leaderboard_side", label: "Leaderboard Side", defaultKey: "S", desc: "Show or hide the compact left-side leaderboard layer." },
+        { id: "scoreboard_full", label: "Scoreboard Full", defaultKey: "B", desc: "Show or hide a full-screen scoreboard with heat columns and totals." },
+        { id: "scoreboard_detail", label: "Scoreboard Detail", defaultKey: "R", desc: "Show or hide a full-screen detailed scoreboard for the top competitors." },
+      ];
+      const boardLayerIds = new Set(["leaderboard_full", "leaderboard_side", "scoreboard_full", "scoreboard_detail"]);
+
+      let latestState = null;
+
+      function formatSeconds(value) {
+        return Kairix.formatSeconds(value);
+      }
+
+      function config() {
+        return latestState?.graphics?.layout_config || {};
+      }
+
+      function hotkeys() {
+        return config().hotkeys || {};
+      }
+
+      function layerHotkey(layer) {
+        return (hotkeys()[layer.id] || layer.defaultKey || "").toUpperCase();
+      }
+
+      function activeLayers() {
+        const known = new Set(layerDefs.map(layer => layer.id));
+        return sanitizedLayers((latestState?.graphics?.enabled_layers || []).filter(layer => known.has(layer)));
+      }
+
+      function sanitizedLayers(layers = []) {
+        const next = [];
+        let boardLayer = null;
+        layers.forEach(layer => {
+          if (boardLayerIds.has(layer)) {
+            if (!boardLayer) {
+              boardLayer = layer;
+              next.push(layer);
+            }
+            return;
+          }
+          next.push(layer);
+        });
+        return next;
+      }
+
+      async function saveGraphics({ layers = null, message = undefined, layoutConfig = null, preset = null } = {}) {
+        const currentGraphics = latestState?.graphics || {};
+        const nextLayers = sanitizedLayers(layers || currentGraphics.enabled_layers || []);
+        await Kairix.API.post("/api/admin/graphics-state", {
+          session_id: gfxSession.session_id,
+          preset: preset || currentGraphics.preset || "layers",
+          enabled_layers: nextLayers,
+          manual_message: message === undefined ? currentGraphics.manual_message : message,
+          fun_detail_mode: Boolean(currentGraphics.fun_detail_mode),
+          show_debug_zones: false,
+          layout_config: layoutConfig || config(),
+        });
+        await refresh();
+      }
+
+      function toggleLayer(name) {
+        const layers = new Set(activeLayers());
+        if (layers.has(name)) {
+          layers.delete(name);
+        } else {
+          if (boardLayerIds.has(name)) boardLayerIds.forEach(layer => layers.delete(layer));
+          layers.add(name);
+        }
+        return [...layers];
+      }
+
+      async function toggleLayerAndSave(name, button = null) {
+        const run = () => saveGraphics({ layers: toggleLayer(name), preset: "layers" });
+        if (button) await Kairix.withButtonFeedback(button, run);
+        else await run();
+      }
+
+      function renderLayers() {
+        const enabled = new Set(activeLayers());
+        document.getElementById("layer-panel").innerHTML = layerDefs.map(layer => {
+          const key = layerHotkey(layer);
+          const active = enabled.has(layer.id);
+          const help = `${key ? `Hotkey ${key}. ` : ""}${layer.desc}`;
+          return `
+            <button class="btn layer-toggle ${active ? "active" : ""}" data-layer="${layer.id}" data-help="${help}" title="${help}">
+              <span>${layer.label}</span>
+              <kbd>${key || "-"}</kbd>
+            </button>
+          `;
+        }).join("");
+        const activeNames = layerDefs.filter(layer => enabled.has(layer.id)).map(layer => layer.label);
+        document.getElementById("active-summary").textContent = activeNames.length ? `Active: ${activeNames.join(", ")}` : "No layers active";
+      }
+
+      function renderState(state) {
+        if (state.timer) state.timer = Kairix.stampTimer(state.timer);
+        latestState = state;
+        document.getElementById("live-current").textContent = Kairix.formatRun(state.current_run);
+        document.getElementById("live-up-next").textContent = `${state.graphics_up_next_label || "UP NEXT"}: ${Kairix.formatRun(state.graphics_up_next_run || state.actual_up_next_run)}`;
+        document.getElementById("live-delay").textContent = state.delay ? `${state.delay.message}${state.delay.countdown_text ? " - " + state.delay.countdown_text : ""}` : "No active delay";
+        document.getElementById("live-timer").textContent = state.timer ? formatSeconds(Kairix.timerDisplaySeconds(state.timer)) : "00:00";
+        const messageBox = document.getElementById("message");
+        if (document.activeElement !== messageBox) {
+          messageBox.value = state.graphics?.manual_message || "";
+        }
+        const manualStyle = config().manual_style || {};
+        document.getElementById("message-large").checked = (manualStyle.size || "large") !== "small";
+        renderLayers();
+      }
+
+      async function refresh() {
+        const state = await Kairix.getEventState({ preferCache: false });
+        renderState(state);
+        const queue = await Kairix.getQueue();
+        const activeRuns = queue.runs.filter(run => !["finished", "skipped", "withdrawn", "disqualified"].includes(run.state || ""));
+        const actualUpNextId = latestState?.actual_up_next_run?.id;
+        const actualIndex = activeRuns.findIndex(run => run.id === actualUpNextId);
+        const distanceText = run => {
+          const index = activeRuns.findIndex(item => item.id === run.id);
+          if (run.id === actualUpNextId) return "actual up next";
+          if (index < 0 || actualIndex < 0) return "manual feature";
+          const diff = index - actualIndex;
+          if (diff > 0) return `${diff} ${diff === 1 ? "car" : "cars"} away`;
+          if (diff < 0) return "before current queue point";
+          return "manual feature";
+        };
+        document.getElementById("feature-list").innerHTML = activeRuns.map(run => {
+          const isCurrent = latestState?.current_run?.id === run.id;
+          const isManualFeatured = latestState?.graphics_featured_run?.id === run.id;
+          const isActualUpNext = actualUpNextId === run.id;
+          const distance = distanceText(run);
+          return `
+          <div class="queue-list-row gfx-feature-row ${isCurrent ? "current-run-highlight" : ""} ${isManualFeatured || isActualUpNext ? "featured-run-highlight" : ""}">
+            <div>
+              <strong>${Kairix.formatRun(run)}</strong>
+              <span>${run.state || "not assigned"} / ${run.run_type}</span>
+              <div class="mini-badges">
+                ${isCurrent ? '<em>CURRENT</em>' : ""}
+                ${isActualUpNext ? '<em>ACTUAL UP NEXT</em>' : ""}
+                ${isManualFeatured ? '<em>MANUAL GFX</em>' : ""}
+                ${!isActualUpNext && !isManualFeatured ? `<em>${distance.toUpperCase()}</em>` : ""}
+              </div>
+            </div>
+            <button class="btn compact ${isManualFeatured ? "active-state" : ""}" data-feature="${run.id}" data-help="Feature this competitor in the Up Next layer without changing judging state. ${isActualUpNext ? "This is already the actual next competitor." : `This competitor is ${distance}.`}">Feature Up Next</button>
+          </div>
+        `;
+        }).join("");
+      }
+
+      document.body.addEventListener("click", async event => {
+        const layerButton = event.target.closest("[data-layer]");
+        if (layerButton) {
+          await toggleLayerAndSave(layerButton.dataset.layer, layerButton);
+        }
+
+        const feature = event.target.closest("[data-feature]");
+        if (feature) {
+          await Kairix.withButtonFeedback(feature, () => fetch(`/api/admin/graphics-featured-run/${feature.dataset.feature}?session_id=${gfxSession.session_id}`, { method: "POST" }));
+          await saveGraphics({ layers: [...new Set([...activeLayers(), "up_next"])], preset: "layers" });
+        }
+      });
+
+      document.getElementById("clear-all").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, () => saveGraphics({ layers: [], preset: "safe_clear" })));
+      document.getElementById("clear-featured").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, async () => {
+        await fetch(`/api/admin/graphics-featured-run/clear?session_id=${gfxSession.session_id}`, { method: "POST" });
+        await saveGraphics({ layers: activeLayers(), preset: "layers" });
+      }));
+      document.getElementById("show-message").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, () => {
+        const cfg = { ...config(), manual_style: { ...(config().manual_style || {}), size: document.getElementById("message-large").checked ? "large" : "small" } };
+        const text = document.getElementById("message").value;
+        const layers = activeLayers().includes("manual_message")
+          ? activeLayers().filter(layer => layer !== "manual_message")
+          : [...new Set([...activeLayers(), "manual_message"])];
+        return saveGraphics({ layers, message: text, layoutConfig: cfg, preset: "layers" });
+      }));
+      document.getElementById("hide-message").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, () => saveGraphics({ layers: activeLayers().filter(layer => layer !== "manual_message"), preset: "layers" })));
+      document.getElementById("clear-message").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, () => saveGraphics({ message: null, layers: activeLayers().filter(layer => layer !== "manual_message"), preset: "layers" })));
+
+      document.addEventListener("keydown", async event => {
+        if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+        const pressed = event.key.toUpperCase();
+        const layer = layerDefs.find(item => layerHotkey(item) === pressed);
+        if (!layer) return;
+        event.preventDefault();
+        await toggleLayerAndSave(layer.id);
+      });
+
+      refresh();
+      setInterval(refresh, 2500);
+    </script>
+  </body>
+</html>

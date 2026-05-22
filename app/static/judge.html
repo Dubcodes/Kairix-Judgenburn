@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Judge Scoring</title>
+    <link rel="icon" href="/static/kairix-judging-system-logo.png">
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <div id="shell" class="judge-shell">
+      <main class="page judge-card">
+        <div class="topline judge-header">
+          <div>
+            <div id="current" class="brand">Loading current competitor</div>
+            <div id="run-meta" class="muted"></div>
+          </div>
+          <div class="judge-status-stack">
+            <span id="run-timer" class="status-pill timer-pill">00:00</span>
+            <span id="delay-pill" class="status-pill delay-pill" style="display:none;"></span>
+            <span id="sync" class="status-pill">Online</span>
+          </div>
+        </div>
+
+        <section id="urgency" class="card" style="display:none; border-color: var(--accent);">
+          <strong>You are still scoring a previous competitor.</strong>
+          <p id="urgency-text" class="muted">Other scoring has moved on. Submit this score or request help before switching.</p>
+        </section>
+
+        <section id="submitted-panel" class="card score-submitted" style="display:none;">
+          <strong>Score submitted.</strong>
+          <p id="submitted-text" class="muted">Waiting for the next competitor.</p>
+        </section>
+
+        <section id="scores" class="card"></section>
+
+        <section class="card judge-actions" style="margin-top: 10px;">
+          <div class="judge-status-row">
+            <span id="score-state" class="status-pill">Waiting</span>
+          </div>
+          <div class="btn-row">
+            <button id="submit" class="btn good" data-help="Submit this run's final score. Blank criteria are saved as not judged after confirmation.">Submit Final Score</button>
+            <button id="issue" class="btn" data-help="Send an issue or delay report to event control without changing the official event state.">Report Issue / Delay</button>
+            <button id="change" class="btn" data-help="Request a correction after submission. The original score remains preserved for audit.">Request Score Change</button>
+            <a class="btn" href="/recovery" data-help="Open local backup and recovery data stored on this judge device.">Backup / Recovery</a>
+          </div>
+          <p id="save-note" class="muted">Waiting for first save</p>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/js/common.js"></script>
+    <script>
+      const state = {
+        session: Kairix.requireRole("judge"),
+        criteria: [],
+        currentRun: null,
+        scoringRun: null,
+        scoringRunId: null,
+        values: {},
+        saveTimer: null,
+        online: true,
+        dirty: false,
+        submittedRunIds: new Set(),
+        latestTimer: null,
+      };
+
+      Kairix.validateSession(state.session, "judge").catch(() => {});
+
+      function loadLocalRecords() {
+        return Kairix.safeJsonParse(localStorage.getItem("kairix_score_records"), []);
+      }
+
+      function saveLocalRecord(record) {
+        const records = loadLocalRecords();
+        const key = `${record.run_id}:${record.device_id}:${record.session_id}`;
+        const idx = records.findIndex(item => item.key === key);
+        const stored = { ...record, key, local_saved_at: new Date().toISOString() };
+        if (idx >= 0) records[idx] = stored;
+        else records.push(stored);
+        localStorage.setItem("kairix_score_records", JSON.stringify(records));
+      }
+
+      function displayValue(value) {
+        return value === null || value === undefined ? '<span class="not-scored">Not scored</span>' : value;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+      }
+
+      function escapeAttr(value) {
+        return escapeHtml(value).replace(/`/g, "&#096;");
+      }
+
+      function formatSeconds(value) {
+        return Kairix.formatSeconds(value);
+      }
+
+      function setScoreState(text, className = "") {
+        const pill = document.getElementById("score-state");
+        pill.textContent = text;
+        pill.className = `status-pill ${className}`.trim();
+      }
+
+      function renderTimer() {
+        const timer = state.latestTimer;
+        if (!timer) {
+          document.getElementById("run-timer").textContent = "00:00";
+          return;
+        }
+        const display = Kairix.timerDisplaySeconds(timer);
+        document.getElementById("run-timer").textContent = formatSeconds(display);
+      }
+
+      function renderScores() {
+        const submitted = state.scoringRunId && state.submittedRunIds.has(state.scoringRunId);
+        document.getElementById("scores").style.display = submitted ? "none" : "block";
+        document.getElementById("submitted-panel").style.display = submitted ? "block" : "none";
+        document.getElementById("submit").disabled = Boolean(submitted);
+        if (submitted) {
+          document.getElementById("submitted-text").textContent = `${Kairix.formatRun(state.scoringRun)} has been submitted. You are done for this competitor and waiting for the next one.`;
+        }
+        document.getElementById("scores").innerHTML = state.criteria.map(item => {
+          const value = state.values[item.id] ?? null;
+          const itemName = escapeHtml(item.name);
+          const itemNameAttr = escapeAttr(item.name);
+          const itemType = escapeHtml(String(item.type || "").replaceAll("_", " "));
+          return `
+            <div class="score-row">
+              <div class="score-label">
+                <strong>${itemName}</strong>
+                <div class="muted">${itemType}</div>
+              </div>
+              <div class="score-control">
+                <button class="btn" data-action="minus" data-id="${item.id}" data-help="Decrease ${itemNameAttr} by its configured step.">-</button>
+                <button class="score-value" data-action="type" data-id="${item.id}" data-help="Type a score for ${itemNameAttr}. Leave blank to mark it as not scored.">${displayValue(value)}</button>
+                <button class="btn" data-action="plus" data-id="${item.id}" data-help="Increase ${itemNameAttr} by its configured step.">+</button>
+              </div>
+                <button class="btn compact clear-score" data-action="clear" data-id="${item.id}" data-help="Clear ${itemNameAttr} back to not scored.">Clear</button>
+            </div>
+          `;
+        }).join("");
+      }
+
+      function clamp(item, value) {
+        let next = value;
+        if (item.min_value !== null) next = Math.max(item.min_value, next);
+        if (item.max_value !== null) next = Math.min(item.max_value, next);
+        return next;
+      }
+
+      function scheduleSave() {
+        clearTimeout(state.saveTimer);
+        state.saveTimer = setTimeout(() => saveDraft("draft"), 250);
+      }
+
+      async function saveDraft(status) {
+        if (!state.scoringRunId) return;
+        const items = state.criteria.map(item => ({
+          criterion_id: item.id,
+          value: state.values[item.id] ?? null,
+          intentionally_blank: state.values[item.id] === null || state.values[item.id] === undefined,
+        }));
+        const payload = {
+          session_id: state.session.session_id,
+          run_id: state.scoringRunId,
+          device_id: Kairix.deviceId(),
+          items,
+          status,
+        };
+        saveLocalRecord(payload);
+        try {
+          const result = await Kairix.API.post("/api/scoring/draft", payload);
+          state.online = true;
+          document.getElementById("sync").textContent = "Synced";
+          if (result.status === "submitted") {
+            state.submittedRunIds.add(state.scoringRunId);
+          document.getElementById("save-note").textContent = result.already_submitted ? "This run was already submitted from this judge account." : `Submitted and synced. Total ${result.total}`;
+            setScoreState("Submitted", "good-pill");
+          } else {
+            document.getElementById("save-note").textContent = `Saved locally and synced. Total ${result.total}`;
+            setScoreState("Draft saved", "good-pill");
+          }
+          return result;
+        } catch (error) {
+          state.online = false;
+          document.getElementById("sync").textContent = status === "submitted" ? "Submit failed" : "Offline, saved locally";
+          document.getElementById("save-note").textContent = status === "submitted" ? `Submit failed: ${error.message}` : "Saved locally. Server sync pending.";
+          setScoreState(status === "submitted" ? "Submit failed" : "Local backup only", status === "submitted" ? "danger-pill" : "warn-pill");
+          if (status === "submitted") throw error;
+          return null;
+        }
+      }
+
+      async function refreshState() {
+        try {
+          const eventState = await Kairix.getEventState();
+          state.latestTimer = eventState.timer;
+          renderTimer();
+          const submissions = await Kairix.API.get(`/api/scoring/my-submissions?session_id=${state.session.session_id}`);
+          state.submittedRunIds = new Set(submissions.submitted_run_ids || []);
+          state.online = true;
+          document.getElementById("sync").textContent = "Online";
+          state.currentRun = eventState.current_run;
+          const delayPill = document.getElementById("delay-pill");
+          if (eventState.delay) {
+            delayPill.style.display = "inline-flex";
+            delayPill.textContent = `${eventState.delay.message}${eventState.delay.countdown_text ? " - " + eventState.delay.countdown_text : ""}`;
+          } else {
+            delayPill.style.display = "none";
+            delayPill.textContent = "";
+          }
+          if (!state.scoringRunId && state.currentRun && !state.submittedRunIds.has(state.currentRun.id)) {
+            state.scoringRunId = state.currentRun.id;
+            state.scoringRun = state.currentRun;
+          }
+
+          if (state.currentRun && state.scoringRunId !== state.currentRun.id && !state.dirty && !state.submittedRunIds.has(state.currentRun.id)) {
+            state.scoringRunId = state.currentRun.id;
+            state.scoringRun = state.currentRun;
+            state.values = {};
+            renderScores();
+          } else if (state.scoringRunId === state.currentRun?.id) {
+            state.scoringRun = state.currentRun;
+          } else if (state.scoringRunId) {
+            const queue = await Kairix.getQueue();
+            state.scoringRun = queue.runs.find(run => run.id === state.scoringRunId) || state.scoringRun;
+          }
+
+          const run = state.scoringRun || state.currentRun;
+          document.getElementById("current").textContent = Kairix.formatRun(run);
+          document.getElementById("run-meta").textContent = run ? `${run.run_type} / ${run.state}` : "";
+          if (state.currentRun && state.submittedRunIds.has(state.currentRun.id) && (!state.scoringRunId || state.scoringRunId === state.currentRun.id)) {
+            state.scoringRunId = state.currentRun.id;
+            state.scoringRun = state.currentRun;
+            state.values = {};
+          }
+
+          const urgent = Boolean(state.dirty && state.scoringRunId && state.currentRun && state.scoringRunId !== state.currentRun.id);
+          document.getElementById("shell").classList.toggle("urgent", urgent);
+          document.getElementById("urgency").style.display = urgent ? "block" : "none";
+          if (urgent) {
+            document.getElementById("urgency-text").textContent = `Current competitor is now ${Kairix.formatRun(state.currentRun)}. Submit this score or request help before switching.`;
+            setScoreState("Needs attention", "warn-pill");
+          } else if (!run) {
+            setScoreState("Waiting", "");
+          } else if (state.scoringRunId && state.submittedRunIds.has(state.scoringRunId)) {
+            setScoreState("Submitted", "good-pill");
+          } else if (state.online) {
+            setScoreState("Ready to score", "");
+          }
+          renderScores();
+        } catch {
+          document.getElementById("sync").textContent = "Offline, saved locally";
+          setScoreState("Offline", "warn-pill");
+        }
+      }
+
+      document.getElementById("scores").addEventListener("click", event => {
+        if (state.scoringRunId && state.submittedRunIds.has(state.scoringRunId)) return;
+        const button = event.target.closest("button");
+        if (!button) return;
+        const id = Number(button.dataset.id);
+        const action = button.dataset.action;
+        const criterion = state.criteria.find(item => item.id === id);
+        if (!criterion) return;
+        const current = state.values[id] ?? null;
+        if (action === "clear") state.values[id] = null;
+        if (action === "plus") state.values[id] = clamp(criterion, (current ?? 0) + Number(criterion.step_size || 1));
+        if (action === "minus") state.values[id] = clamp(criterion, (current ?? 0) - Number(criterion.step_size || 1));
+        if (action === "type") {
+          const typed = prompt(`Enter score for ${criterion.name}`, current ?? "");
+          if (typed === null) return;
+          if (typed.trim() === "") state.values[id] = null;
+          else state.values[id] = clamp(criterion, Number(typed));
+        }
+        state.dirty = true;
+        setScoreState("Draft not synced", "warn-pill");
+        renderScores();
+        scheduleSave();
+      });
+
+      document.getElementById("submit").addEventListener("click", async (event) => {
+        clearTimeout(state.saveTimer);
+        if (state.scoringRunId && state.submittedRunIds.has(state.scoringRunId)) {
+          alert("This score has already been submitted.");
+          return;
+        }
+        const missing = state.criteria.filter(item => state.values[item.id] === null || state.values[item.id] === undefined);
+        if (missing.length) {
+          const ok = confirm("Some scoring items are still blank.\n\nBlank items will be recorded as not judged, not zero.\n\nSubmit anyway?");
+          if (!ok) return;
+        }
+        let result;
+        try {
+          result = await Kairix.withButtonFeedback(event.currentTarget, () => saveDraft("submitted"));
+        } catch (error) {
+          alert(`Submit failed. The score is still saved locally.\n\n${error.message}`);
+          return;
+        }
+        if (!result || result.status !== "submitted") {
+          alert("Submit did not complete. The score is still saved locally, but it was not accepted by the server.");
+          return;
+        }
+        state.submittedRunIds.add(state.scoringRunId);
+        state.values = {};
+        state.dirty = false;
+        renderScores();
+        await refreshState();
+      });
+
+      document.getElementById("issue").addEventListener("click", async (event) => {
+        const issue_type = prompt("Issue type: safety, track, visibility, car, scoring, technical, other", "scoring");
+        if (!issue_type) return;
+        const note = prompt("Optional note", "");
+        await Kairix.withButtonFeedback(event.currentTarget, () => Kairix.API.post("/api/scoring/issue-report", {
+          session_id: state.session.session_id,
+          run_id: state.scoringRunId,
+          device_id: Kairix.deviceId(),
+          issue_type,
+          note,
+        }));
+        alert("Issue report sent.");
+      });
+
+      document.getElementById("change").addEventListener("click", async event => {
+        if (!state.scoringRunId) {
+          alert("No run is selected for this device yet.");
+          return;
+        }
+        if (!state.submittedRunIds.has(state.scoringRunId)) {
+          alert("Score change requests are for already submitted scores. You can still edit this draft before final submit.");
+          return;
+        }
+        const reason = prompt("Reason for score change request");
+        if (!reason) return;
+        const requested = prompt("What should be changed? Example: Tyre burst should be 2, Pad Use should be 24.", "");
+        await Kairix.withButtonFeedback(event.currentTarget, () => Kairix.API.post("/api/scoring/change-request", {
+          session_id: state.session.session_id,
+          run_id: state.scoringRunId,
+          device_id: Kairix.deviceId(),
+          reason,
+          requested_changes: {
+            note: requested || "",
+            current_local_values: state.values,
+          },
+        }));
+        alert("Score change request sent.");
+      });
+
+      async function init() {
+        const criteria = await Kairix.API.get("/api/criteria");
+        state.criteria = criteria.criteria;
+        renderScores();
+        await refreshState();
+        setInterval(refreshState, 3000);
+        setInterval(renderTimer, 1000);
+      }
+      init();
+    </script>
+  </body>
+</html>

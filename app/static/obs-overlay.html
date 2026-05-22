@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OBS Overlay</title>
+    <link rel="icon" href="/static/kairix-judging-system-logo.png">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+      html,
+      body {
+        background: transparent !important;
+      }
+    </style>
+  </head>
+  <body class="overlay-body">
+    <div id="delay" class="overlay-layer"></div>
+    <div id="lower" class="overlay-layer"></div>
+    <div id="upnext" class="overlay-layer"></div>
+    <div id="meter" class="overlay-layer"></div>
+    <div id="timer" class="overlay-layer timer-layer"></div>
+    <div id="manual" class="overlay-layer"></div>
+    <div id="logo" class="overlay-layer logo-layer"></div>
+    <div id="leaderboard_full" class="overlay-layer leaderboard-layer"></div>
+    <div id="leaderboard_side" class="overlay-layer leaderboard-layer leaderboard-side-layer"></div>
+    <div id="scoreboard_full" class="overlay-layer scoreboard-layer"></div>
+    <div id="scoreboard_detail" class="overlay-layer scoreboard-layer scoreboard-detail-layer"></div>
+    <script src="/static/js/common.js"></script>
+    <script>
+      const defaults = {
+        lower: { x: 56, y: 760, w: 760, animation: "slide-up", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+        upnext: { x: 1330, y: 190, w: 500, animation: "slide-left", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+        delay: { x: 480, y: 38, w: 960, animation: "fade", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "center", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+        meter: { x: 1444, y: 790, w: 420, animation: "slide-up", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+        timer: { x: 820, y: 780, w: 280, animation: "slide-up", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "center", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+        manual: { x: 360, y: 410, w: 1200, animation: "pop", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "center", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+        logo: { x: 1540, y: 42, w: 300, animation: "fade", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "center", padding: 0, bg_alpha: 0, text_color: "#ffffff" },
+        leaderboard_full: { x: 240, y: 140, w: 1440, animation: "pop", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 28, bg_alpha: 82, text_color: "#ffffff" },
+        leaderboard_side: { x: 48, y: 150, w: 640, animation: "slide-right", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 20, bg_alpha: 82, text_color: "#ffffff" },
+        scoreboard_full: { x: 100, y: 70, w: 1720, animation: "pop", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 30, bg_alpha: 84, text_color: "#ffffff" },
+        scoreboard_detail: { x: 130, y: 86, w: 1660, animation: "zoom", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 30, bg_alpha: 84, text_color: "#ffffff" },
+      };
+      const allowedFonts = ["Arial", "Impact", "Trebuchet MS", "Verdana", "Georgia"];
+      const allowedAlign = ["left", "center", "right"];
+      const allowedAnimations = ["fade", "none", "slide-up", "slide-down", "slide-left", "slide-right", "pop", "zoom", "drop", "rise"];
+
+      function layerEnabled(state, name) {
+        return state.graphics?.enabled_layers?.includes(name);
+      }
+
+      const boardLayerOrder = ["leaderboard_full", "leaderboard_side", "scoreboard_full", "scoreboard_detail"];
+
+      function activeBoardLayer(state) {
+        return boardLayerOrder.find(layer => layerEnabled(state, layer)) || null;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+      }
+
+      function escapeAttr(value) {
+        return escapeHtml(value).replace(/`/g, "&#96;");
+      }
+
+      function clamp(value, min, max) {
+        const number = Number(value);
+        if (!Number.isFinite(number)) return min;
+        return Math.max(min, Math.min(max, number));
+      }
+
+      function layoutFor(state, key) {
+        const canvas = state.graphics?.layout_config?.canvas || { width: 1920, height: 1080 };
+        const raw = { ...defaults[key], ...(state.graphics?.layout_config?.[key] || {}) };
+        const minWidth = key === "manual" ? 220 : 120;
+        const width = clamp(raw.w, minWidth, canvas.width);
+        return {
+          ...raw,
+          x: clamp(raw.x, 0, canvas.width - width),
+          y: clamp(raw.y, 0, canvas.height - 80),
+          w: width,
+          font_scale: clamp(raw.font_scale ?? 100, 50, 180),
+          font_weight: clamp(raw.font_weight ?? defaults[key].font_weight, 300, 1000),
+          font_family: allowedFonts.includes(raw.font_family) ? raw.font_family : defaults[key].font_family,
+          text_align: allowedAlign.includes(raw.text_align) ? raw.text_align : defaults[key].text_align,
+          padding: clamp(raw.padding ?? defaults[key].padding, 0, 50),
+          bg_alpha: clamp(raw.bg_alpha ?? defaults[key].bg_alpha, 0, 100),
+          text_color: /^#[0-9a-fA-F]{6}$/.test(raw.text_color || "") ? raw.text_color : defaults[key].text_color,
+          canvas_width: Number(canvas.width || 1920),
+          canvas_height: Number(canvas.height || 1080),
+        };
+      }
+
+      const layerCache = {};
+      const layerComparableCache = {};
+      let frozenCurrentRun = null;
+      let frozenUpNextRun = null;
+      function setLayer(id, show, layout, html) {
+        const el = document.getElementById(id);
+        const nextHtml = html || "";
+        const comparableHtml = id === "meter"
+          ? nextHtml.replace(/width:\d+%/g, "width:%")
+          : id === "timer"
+            ? "TIMER"
+            : id === "delay"
+              ? nextHtml.replace(/<div class="delay-countdown"[^>]*>.*?<\/div>/g, '<div class="delay-countdown"></div>')
+            : ["lower", "upnext"].includes(id)
+              ? nextHtml.match(/data-run-id="([^"]+)"/)?.[1] || nextHtml
+            : nextHtml;
+        const animation = allowedAnimations.includes(layout.animation) ? layout.animation : "fade";
+        const specialClass = {
+          logo: "logo-layer",
+          leaderboard_full: "leaderboard-layer leaderboard-full-layer",
+          leaderboard_side: "leaderboard-layer leaderboard-side-layer",
+          scoreboard_full: "scoreboard-layer scoreboard-full-layer",
+          scoreboard_detail: "scoreboard-layer scoreboard-detail-layer",
+        }[id] || "";
+        const nextClass = `overlay-layer ${animation} ${specialClass}`.trim();
+        if (el.dataset.layerClass !== nextClass) {
+          el.className = nextClass;
+          el.dataset.layerClass = nextClass;
+        }
+        const scaleX = window.innerWidth / (layout.canvas_width || 1920);
+        const scaleY = window.innerHeight / (layout.canvas_height || 1080);
+        el.style.left = `${layout.x * scaleX}px`;
+        el.style.top = `${layout.y * scaleY}px`;
+        el.style.width = `${layout.w * scaleX}px`;
+        el.style.setProperty("--layer-scale", `${(layout.font_scale || 100) / 100}`);
+        el.style.padding = `${Number(layout.padding ?? 18) * Math.min(scaleX, scaleY)}px ${Number(layout.padding ?? 18) * 1.35 * scaleX}px`;
+        el.style.background = `rgba(10, 10, 10, ${Number(layout.bg_alpha ?? 78) / 100})`;
+        el.style.color = layout.text_color || "#ffffff";
+        el.style.fontFamily = layout.font_family || "Arial";
+        el.style.fontWeight = String(layout.font_weight || 900);
+        el.style.textAlign = layout.text_align || "left";
+        if (layerComparableCache[id] !== comparableHtml) {
+          if (el.classList.contains("show") && layerComparableCache[id] !== undefined) {
+            el.classList.add("content-changing");
+            setTimeout(() => {
+              el.innerHTML = nextHtml;
+              layerCache[id] = nextHtml;
+              layerComparableCache[id] = comparableHtml;
+              requestAnimationFrame(() => el.classList.remove("content-changing"));
+            }, 160);
+          } else {
+            el.innerHTML = nextHtml;
+            layerCache[id] = nextHtml;
+            layerComparableCache[id] = comparableHtml;
+          }
+        } else if (id === "meter" && layerCache[id] !== nextHtml) {
+          const nextWidth = nextHtml.match(/width:(\d+)%/)?.[1];
+          const fill = el.querySelector(".meter-fill");
+          if (nextWidth && fill) fill.style.width = `${nextWidth}%`;
+          layerCache[id] = nextHtml;
+        } else if (id === "timer" && layerCache[id] !== nextHtml) {
+          const nextTime = nextHtml.match(/>([-\d:]+)</)?.[1];
+          const timeEl = el.querySelector(".timer-gfx");
+          if (nextTime && timeEl) timeEl.textContent = nextTime;
+          const className = nextHtml.match(/class="([^"]+)"/)?.[1];
+          if (className && timeEl) timeEl.className = className;
+          layerCache[id] = nextHtml;
+        } else if (id === "delay" && layerCache[id] !== nextHtml) {
+          const nextCountdown = nextHtml.match(/<div class="delay-countdown"[^>]*>([\s\S]*?)<\/div>/)?.[1] || "";
+          const countdownEl = el.querySelector(".delay-countdown");
+          if (countdownEl) countdownEl.innerHTML = nextCountdown;
+          layerCache[id] = nextHtml;
+        } else if (["lower", "upnext"].includes(id) && layerCache[id] !== nextHtml) {
+          el.innerHTML = nextHtml;
+          layerCache[id] = nextHtml;
+        }
+        requestAnimationFrame(() => el.classList.toggle("show", Boolean(show)));
+      }
+
+      function activeNonLogoLayerCount(state) {
+        return (state.graphics?.enabled_layers || []).filter(layer => layer !== "logo").length;
+      }
+
+      function logoHtml(state) {
+        const logoStyle = state.graphics?.layout_config?.logo_style || {};
+        const src = String(logoStyle.url || "").trim();
+        if (!src) return "";
+        return `<img class="logo-layer-img" src="${escapeAttr(src)}" alt="" onerror="this.style.display='none'">`;
+      }
+
+      function leaderboardSourceRows(state) {
+        if (Array.isArray(state.leaderboard) && state.leaderboard.length) return state.leaderboard;
+        return (state.queue || []).slice(0, 10).map((run, index) => ({
+          position: index + 1,
+          entry_number: run.competitor?.entry_number || "",
+          driver_name: run.competitor?.driver_name || "",
+          class_name: run.competitor?.class_name || "",
+          vehicle_name: run.vehicle?.name || "",
+          total: null,
+        }));
+      }
+
+      function leaderboardHtml(state, mode) {
+        const rows = leaderboardSourceRows(state);
+        const limit = mode === "side" ? 7 : 10;
+        const scoresAllowed = state.settings?.show_graphics_total_scores !== false;
+        const hasScores = scoresAllowed && rows.some(row => row.total !== null && row.total !== undefined);
+        return `
+          <div class="leaderboard-title">${hasScores ? "Leaderboard" : "Run Order"}</div>
+          <div class="leaderboard-rows ${mode === "side" ? "compact" : ""}">
+            ${rows.slice(0, limit).map(row => `
+              <div class="leaderboard-row">
+                <div class="leaderboard-position">${row.position}</div>
+                <div class="leaderboard-name">
+                  <strong>#${escapeHtml(row.entry_number)} ${escapeHtml(row.driver_name)}</strong>
+                  <span>${escapeHtml(row.vehicle_name || "")}</span>
+                </div>
+                <div class="leaderboard-score">${!scoresAllowed || row.total === null || row.total === undefined ? "--" : escapeHtml(Number(row.total).toFixed(1))}</div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function scoreText(value) {
+        return value === null || value === undefined ? "--" : Number(value).toFixed(1);
+      }
+
+      function scoreboardHeatNumbers(rows, state) {
+        const heats = new Set();
+        rows.forEach(row => (row.heat_scores || []).forEach(item => {
+          const heat = Number(item.heat_number || 0);
+          if (heat > 0) heats.add(heat);
+        }));
+        if (!heats.size) {
+          const currentHeat = Math.max(1, Number(state.current_heat || 1));
+          for (let heat = 1; heat <= Math.min(currentHeat, 3); heat += 1) heats.add(heat);
+        }
+        return [...heats].sort((a, b) => a - b).slice(0, 6);
+      }
+
+      function heatScore(row, heatNumber) {
+        const score = (row.heat_scores || []).find(item => Number(item.heat_number || 0) === Number(heatNumber));
+        return scoreText(score?.total);
+      }
+
+      function scoreboardFullHtml(state) {
+        const rows = leaderboardSourceRows(state).slice(0, 12);
+        const heatNumbers = scoreboardHeatNumbers(rows, state);
+        const scoresAllowed = state.settings?.show_graphics_total_scores !== false;
+        const title = scoresAllowed && rows.some(row => row.total !== null && row.total !== undefined) ? "Scoreboard" : "Run Order";
+        return `
+          <div class="scoreboard-title-row">
+            <div>
+              <div class="scoreboard-kicker">${escapeHtml(state.event?.name || "")}</div>
+              <div class="scoreboard-title">${title}</div>
+            </div>
+            <div class="scoreboard-mode">${escapeHtml(scoresAllowed ? state.settings?.result_mode_label || "All heats" : "Scores hidden")}</div>
+          </div>
+          <table class="scoreboard-table">
+            <thead>
+              <tr>
+                <th>Pos</th>
+                <th>Entry</th>
+                <th>Driver</th>
+                <th>Vehicle</th>
+                ${heatNumbers.map(heat => `<th>H${heat}</th>`).join("")}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(row => `
+                <tr>
+                  <td>${escapeHtml(row.position || "")}</td>
+                  <td>#${escapeHtml(row.entry_number || "")}</td>
+                  <td>${escapeHtml(row.driver_name || "")}</td>
+                  <td>${escapeHtml(row.vehicle_name || "")}</td>
+                  ${heatNumbers.map(heat => `<td>${scoresAllowed ? escapeHtml(heatScore(row, heat)) : "--"}</td>`).join("")}
+                  <td class="scoreboard-total">${scoresAllowed ? escapeHtml(scoreText(row.total)) : "--"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      function scoreboardDetailHtml(state) {
+        const rows = leaderboardSourceRows(state).slice(0, 6);
+        const heatNumbers = scoreboardHeatNumbers(rows, state);
+        const scoresAllowed = state.settings?.show_graphics_total_scores !== false;
+        return `
+          <div class="scoreboard-title-row">
+            <div>
+              <div class="scoreboard-kicker">${escapeHtml(state.event?.venue || state.event?.name || "")}</div>
+              <div class="scoreboard-title">Top Scores</div>
+            </div>
+            <div class="scoreboard-mode">${escapeHtml(scoresAllowed ? state.settings?.result_mode_label || "All heats" : "Scores hidden")}</div>
+          </div>
+          <div class="scoreboard-detail-grid">
+            ${rows.map(row => `
+              <div class="scoreboard-detail-card">
+                <div class="scoreboard-detail-rank">${escapeHtml(row.position || "")}</div>
+                <div class="scoreboard-detail-main">
+                  <strong>#${escapeHtml(row.entry_number || "")} ${escapeHtml(row.driver_name || "")}</strong>
+                  <span>${escapeHtml(row.vehicle_name || "")}${row.class_name ? ` · ${escapeHtml(row.class_name)}` : ""}</span>
+                  <div class="scoreboard-heat-pills">
+                    ${heatNumbers.map(heat => `<em>H${heat} ${scoresAllowed ? escapeHtml(heatScore(row, heat)) : "--"}</em>`).join("")}
+                  </div>
+                </div>
+                <div class="scoreboard-detail-total">
+                  <span>Total</span>
+                  <strong>${scoresAllowed ? escapeHtml(scoreText(row.total)) : "--"}</strong>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function runScoreLine(run, state, config = {}) {
+        const total = run?.score?.competitor_total;
+        if (!state.settings?.show_graphics_total_scores || !config.show_total_score || total === null || total === undefined) return "";
+        const label = run.score?.result_mode_label || state.settings?.result_mode_label || "Total";
+        return `<div style="font-size: 22px; opacity: .9;">${escapeHtml(label)}: ${escapeHtml(Number(total).toFixed(1))}</div>`;
+      }
+
+      function displayRun(run, config = {}, state = {}) {
+        if (!run) return "";
+        const meta = [];
+        if (config.show_run_type) meta.push(run.run_type);
+        if (config.show_state !== false && run.state) meta.push(run.state.replaceAll("_", " "));
+        if (config.show_class && run.competitor.class_name) meta.push(run.competitor.class_name);
+        const engine = config.show_engine !== false ? run.vehicle?.engine || "" : "";
+        return `
+          <div data-run-id="${run.id}">
+           ${meta.length ? `<div style="font-size: 24px; opacity: .85; text-transform: uppercase;">${meta.join(" / ")}</div>` : ""}
+           <div style="font-size: 54px; font-weight: 900;">#${run.competitor.entry_number} ${run.competitor.driver_name}</div>
+           <div style="font-size: 30px;">${run.vehicle?.name || ""} ${engine}</div>
+           ${runScoreLine(run, state, config)}
+           </div>
+        `;
+      }
+
+      function formatSeconds(value) {
+        return Kairix.formatSeconds(value);
+      }
+
+      function timerClass(state) {
+        const timerConfig = state.graphics?.layout_config?.timer_style || {};
+        const over = state.timer?.over_seconds || 0;
+        if (over >= Number(timerConfig.danger_over_seconds ?? 10)) return "danger-time";
+        if (over >= Number(timerConfig.warn_over_seconds ?? 0) && over > 0) return "warn-time";
+        return "";
+      }
+
+      async function refresh(liveState = null) {
+        const state = liveState || await Kairix.getEventState();
+        const displayConfig = state.graphics?.layout_config?.display || {};
+        const upNextDisplay = state.graphics?.layout_config?.up_next_display || {};
+        const manualConfig = state.graphics?.layout_config?.manual_style || {};
+        const followMode = state.graphics?.layout_config?.follow_mode || "direct";
+        const currentLayerLive = layerEnabled(state, "current_competitor") && state.current_run;
+        const rawUpNextRun = state.graphics_up_next_run || state.actual_up_next_run;
+        const upNextLayerLive = layerEnabled(state, "up_next") && rawUpNextRun;
+        if (!currentLayerLive || followMode === "direct") frozenCurrentRun = state.current_run;
+        else if (!frozenCurrentRun) frozenCurrentRun = state.current_run;
+        if (!upNextLayerLive || followMode === "direct") frozenUpNextRun = rawUpNextRun;
+        else if (!frozenUpNextRun) frozenUpNextRun = rawUpNextRun;
+        const currentRun = followMode === "loose" && currentLayerLive ? frozenCurrentRun : state.current_run;
+        const upNextRun = followMode === "loose" && upNextLayerLive ? frozenUpNextRun : rawUpNextRun;
+
+        setLayer(
+          "lower",
+          currentLayerLive,
+          layoutFor(state, "lower"),
+          displayRun(currentRun, displayConfig, state)
+        );
+
+        const upNextLabel = state.graphics_up_next_label || (state.graphics_featured_run ? "FEATURED" : "UP NEXT");
+        setLayer(
+          "upnext",
+          upNextLayerLive,
+          layoutFor(state, "upnext"),
+          upNextRun ? `
+            <div data-run-id="${upNextRun.id}">
+            ${upNextDisplay.show_label === false ? "" : `<div style="font-size: 22px; opacity:.85;">${upNextLabel}</div>`}
+            <div style="font-size: 34px; font-weight:900;">#${upNextRun.competitor.entry_number} ${upNextRun.competitor.driver_name}</div>
+            ${upNextDisplay.show_car === false ? "" : `<div style="font-size: 22px;">${upNextRun.vehicle?.name || ""}${upNextDisplay.show_engine ? " " + (upNextRun.vehicle?.engine || "") : ""}</div>`}
+            ${upNextDisplay.show_class && upNextRun.competitor.class_name ? `<div style="font-size: 18px; opacity:.82;">${upNextRun.competitor.class_name}</div>` : ""}
+            ${runScoreLine(upNextRun, state, upNextDisplay)}
+            </div>
+          ` : ""
+        );
+
+        setLayer(
+          "delay",
+          state.delay && layerEnabled(state, "delay"),
+          layoutFor(state, "delay"),
+          state.delay ? `<div style="font-size: 42px; font-weight: 900;">${state.delay.message}</div><div class="delay-countdown" style="font-size: 26px;">${state.delay.countdown_text || ""}</div>` : ""
+        );
+
+        const meterLabel = state.judge_likeness.label || "Judge Heat";
+        const meterText = state.graphics?.fun_detail_mode
+          ? `<div style="font-size: 22px;">Smoke / Style / Pad</div><div style="font-size: 34px; font-weight: 900;">${state.judge_likeness.value}%</div>`
+          : `<div class="meter-label">${meterLabel}</div>`;
+        setLayer(
+          "meter",
+          layerEnabled(state, "judge_likeness"),
+          layoutFor(state, "meter"),
+          `${meterText}<div class="meter-track"><div class="meter-fill" style="width:${state.judge_likeness.value}%"></div></div>`
+        );
+
+        setLayer(
+          "timer",
+          layerEnabled(state, "timer") && state.timer,
+          layoutFor(state, "timer"),
+          state.timer ? `<div class="timer-gfx ${timerClass(state)}" style="--timer-shake:${Number(state.graphics?.layout_config?.timer_style?.shake_px ?? 3)}px">${formatSeconds(Kairix.timerDisplaySeconds(state.timer))}</div>` : ""
+        );
+
+        const manualFont = (manualConfig.size || "large") === "small"
+          ? Number(manualConfig.small_font || 34)
+          : Number(manualConfig.large_font || 56);
+        const manualLayout = layoutFor(state, "manual");
+        if (manualConfig.dynamic_width !== false) {
+          const text = state.graphics?.manual_message || "";
+          const target = Math.ceil(text.length * manualFont * 0.62) + 96;
+          const minWidth = Number(manualConfig.min_width || 260);
+          const maxWidth = Math.min(Number(manualConfig.max_width || 1100), manualLayout.canvas_width);
+          const oldCenter = manualLayout.x + manualLayout.w / 2;
+          manualLayout.w = clamp(target, minWidth, maxWidth);
+          manualLayout.x = clamp(oldCenter - manualLayout.w / 2, 0, manualLayout.canvas_width - manualLayout.w);
+        }
+        setLayer(
+          "manual",
+          state.graphics?.manual_message && layerEnabled(state, "manual_message"),
+          manualLayout,
+          `<div class="manual-message-gfx" style="font-size:${manualFont}px;">${state.graphics?.manual_message || ""}</div>`
+        );
+
+        const logoStyle = state.graphics?.layout_config?.logo_style || {};
+        const logoLayout = layoutFor(state, "logo");
+        const logoOpacity = activeNonLogoLayerCount(state)
+          ? Number(logoStyle.opacity_with_layers ?? 70) / 100
+          : Number(logoStyle.opacity_alone ?? 25) / 100;
+        const logoEl = document.getElementById("logo");
+        logoEl.style.setProperty("--logo-opacity", `${clamp(logoOpacity, 0, 1)}`);
+        setLayer("logo", layerEnabled(state, "logo") && Boolean(String(logoStyle.url || "").trim()), logoLayout, logoHtml(state));
+        const liveBoardLayer = activeBoardLayer(state);
+
+        setLayer(
+          "leaderboard_full",
+          liveBoardLayer === "leaderboard_full",
+          layoutFor(state, "leaderboard_full"),
+          leaderboardHtml(state, "full")
+        );
+
+        setLayer(
+          "leaderboard_side",
+          liveBoardLayer === "leaderboard_side",
+          layoutFor(state, "leaderboard_side"),
+          leaderboardHtml(state, "side")
+        );
+
+        setLayer(
+          "scoreboard_full",
+          liveBoardLayer === "scoreboard_full",
+          layoutFor(state, "scoreboard_full"),
+          scoreboardFullHtml(state)
+        );
+
+        setLayer(
+          "scoreboard_detail",
+          liveBoardLayer === "scoreboard_detail",
+          layoutFor(state, "scoreboard_detail"),
+          scoreboardDetailHtml(state)
+        );
+      }
+      refresh();
+      Kairix.subscribeLiveState(refresh);
+    </script>
+  </body>
+</html>

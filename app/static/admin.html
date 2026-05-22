@@ -1,0 +1,2538 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Dashboard</title>
+    <link rel="icon" href="/static/kairix-judging-system-logo.png">
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <main class="page wide">
+      <div class="topline">
+        <div class="brand-block">
+          <div class="brand-row">
+            <img class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
+            <div class="brand">Admin Dashboard</div>
+          </div>
+          <div id="who" class="muted"></div>
+        </div>
+        <div class="btn-row">
+          <a class="btn high-admin-link" href="/gfx-control" data-help="Open the graphics control board. Available to high admin and owner.">Graphics</a>
+          <a class="btn" href="/queue" data-help="Open the public-safe competitor queue display in this tab.">Queue Display</a>
+          <a class="btn" href="/" data-help="Return to the landing page and PIN login.">Home</a>
+        </div>
+      </div>
+
+      <nav class="tabs">
+        <div class="tab-cluster">
+          <div class="tab-label">Run Day</div>
+          <span class="tab-group">
+            <button class="btn tab active" data-tab="control" data-help="Open current-run controls, quick delays, queue preview, and the official run timer.">Run Control</button>
+            <button class="btn tab" data-tab="scoring" data-help="Open the live scoring monitor for judge submissions.">Scoring</button>
+            <button class="btn tab" data-tab="results" data-help="Open results review grouped by heat.">Results</button>
+          </span>
+        </div>
+        <div class="tab-cluster">
+          <div class="tab-label">Setup</div>
+          <span class="tab-group">
+            <button class="btn tab" data-tab="competitors" data-help="Open competitor ordering, editing, and manual competitor add.">Competitors</button>
+            <button class="btn tab" data-tab="import" data-help="Preview and finalize CSV or Excel competitor imports.">Import</button>
+            <button class="btn tab" data-tab="criteria" data-help="Open the scoring criteria builder.">Criteria</button>
+            <button class="btn tab high-admin-only" data-tab="settings" data-help="Open event settings, the landing-page notice, and active session monitoring.">Settings</button>
+          </span>
+        </div>
+        <div class="tab-cluster owner-cluster">
+          <div class="tab-label">Owner</div>
+          <span class="tab-group">
+            <button class="btn tab owner-only" data-tab="pins" data-help="Owner only: add, edit, and deactivate PIN accounts.">PINs</button>
+            <button class="btn tab owner-only" data-tab="database" data-help="Owner only: inspect row counts and clean up event data state.">Database</button>
+            <button class="btn tab owner-only" data-tab="owner" data-help="Owner only: theme, backup, restore, and event data reset tools.">Owner</button>
+          </span>
+        </div>
+      </nav>
+
+      <section class="sticky-summary card">
+        <div class="summary-grid">
+          <div class="summary-card">
+            <span>Event</span>
+            <strong id="summary-event">Loading</strong>
+          </div>
+          <div class="summary-card">
+            <span>Official Current</span>
+            <strong id="summary-current">Loading</strong>
+          </div>
+          <div class="summary-card">
+            <span>Up Next</span>
+            <strong id="summary-up-next">Loading</strong>
+          </div>
+          <div class="summary-card">
+            <span>Active Heat</span>
+            <strong id="summary-heat">Loading</strong>
+          </div>
+          <div class="summary-card">
+            <span>Timer</span>
+            <strong id="summary-timer">00:00</strong>
+          </div>
+          <div class="summary-card">
+            <span>Official Delay</span>
+            <strong id="summary-delay">No active delay</strong>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-control" class="panel active">
+        <div class="grid">
+          <div class="card">
+            <h2>Current Run</h2>
+            <p id="current">Loading</p>
+            <div class="btn-row">
+              <button class="btn" data-state="none" data-help="Clear the current competitor's flow state without changing who is current.">Clear State</button>
+              <button class="btn" data-state="queued" data-help="Mark the current competitor as queued and waiting their turn.">Queued</button>
+              <button class="btn" data-state="staging" data-help="Mark the current competitor as staging and getting ready to enter the pad.">Staging</button>
+              <button class="btn" data-state="on_pad" data-help="Mark the current competitor as on pad and open for judging. Can also start the timer if enabled.">On Pad</button>
+              <button class="btn warn" data-state="mechanical_issue" data-help="Mark the current competitor as having a mechanical issue or breakdown.">Mechanical Issue</button>
+              <button class="btn primary" data-state="finished" data-help="Finish the current competitor, stop the timer, and advance to the next run when available.">Finished</button>
+              <button class="btn compact danger" data-state-action="clear-current" data-help="Clear the official current run. Judges will no longer have a current competitor until one is set.">Clear Current</button>
+            </div>
+          </div>
+          <div class="card high-admin-link">
+            <h2>Heat Control</h2>
+            <p id="control-heat-live" class="status-pill">Heat 1</p>
+            <p id="control-heat-next" class="muted">Next heat waiting</p>
+            <div class="btn-row compact-actions">
+              <button id="arm-next-heat" class="btn compact" data-help="Arm the next heat change. This does not change the event until the confirm button is pressed.">Arm Next Heat</button>
+              <button id="confirm-next-heat" class="btn compact primary" disabled data-help="After arming, confirm changing the active heat. Disabled again after a few seconds.">Confirm Next Heat</button>
+            </div>
+            <div class="section-gap-sm">
+              <p class="muted small-copy">Current run type</p>
+              <div class="btn-row compact-actions">
+                <button class="btn compact" data-current-run-type="competition" data-help="Mark the current run as competition and include it in official results.">Competition</button>
+                <button class="btn compact" data-current-run-type="demo" data-help="Mark the current run as a demo. It can still be judged, but is excluded from official results.">Demo</button>
+                <button class="btn compact" data-current-run-type="fun" data-help="Mark the current run as fun/exhibition style and exclude it from official results.">Fun</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Delay Control</h2>
+            <p id="control-delay-live" class="status-pill">No active delay</p>
+            <label class="compact-field section-gap-sm">Approx minutes
+              <input id="control-delay-minutes" type="number" min="0" value="5">
+            </label>
+            <div class="btn-row section-gap-sm">
+              <button class="btn" data-quick-delay="Lunch break" data-minutes="30" data-help="Create an official lunch break delay using the minutes field or the default 30 minutes.">Lunch Break</button>
+              <button class="btn" data-quick-delay="Track cleanup" data-minutes="5" data-help="Create an official track cleanup delay using the minutes field or the default 5 minutes.">Track Cleanup</button>
+              <button class="btn" data-quick-delay="Breakdown recovery" data-minutes="10" data-help="Create an official breakdown recovery delay using the minutes field or the default 10 minutes.">Breakdown Delay</button>
+              <button class="btn danger" data-control-delay="custom" data-help="Create or replace an official delay using your own message and duration.">Custom Delay</button>
+              <button class="btn" data-control-delay-clear data-help="Clear the official delay from admin, judge, queue, and graphics displays.">Clear Delay</button>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Run Timer</h2>
+            <p id="timer-live" class="timer-readout">00:00</p>
+            <p id="timer-status" class="muted timer-status">ready</p>
+            <div class="grid tight">
+              <label>Mode
+                <select id="timer-mode">
+                  <option value="count_up">Count up</option>
+                  <option value="count_down">Count down</option>
+                </select>
+              </label>
+              <label>Target / display time
+                <input id="timer-value" inputmode="numeric" value="01:30" placeholder="01:30">
+              </label>
+              <label>Max / overtime time
+                <input id="timer-max" inputmode="numeric" value="01:30" placeholder="01:30">
+              </label>
+            </div>
+            <div class="btn-row compact-actions">
+              <button class="btn compact" data-timer-step="-10" data-help="Reduce the timer target/display value by 10 seconds.">-10s</button>
+              <button class="btn compact" data-timer-step="10" data-help="Increase the timer target/display value by 10 seconds.">+10s</button>
+              <button class="btn compact good" data-timer-action="start" data-help="Start or resume the official timer for the current run.">Start</button>
+              <button class="btn compact" data-timer-action="stop" data-help="Pause the official timer and preserve its current displayed time.">Stop</button>
+              <button class="btn compact danger" data-timer-action="reset" data-help="Reset the official timer back to the configured target/display time.">Reset</button>
+            </div>
+            <label class="switch-control section-gap-sm" data-help="When enabled, pressing On Pad also starts the official run timer. Turn this off if you want to stage/on-pad a car before timing begins.">
+              <input id="auto-start-on-pad" type="checkbox" checked>
+              <span class="switch-track" aria-hidden="true"></span>
+              <span>On Pad starts timer</span>
+            </label>
+          </div>
+        </div>
+        <section class="card section-gap-md judge-alert-card">
+          <div class="score-monitor-head judge-alert-head">
+            <div>
+              <h2>Judge Alerts</h2>
+              <p class="muted">Issue reports and score correction requests from judge phones.</p>
+            </div>
+            <div class="judge-alert-actions">
+              <span id="judge-alert-count" class="status-pill">0 open</span>
+              <button id="toggle-judge-alerts" class="btn compact" type="button" aria-expanded="true" data-help="Minimize judge alerts into a compact count bar, or expand them when the operator is ready.">Collapse</button>
+            </div>
+          </div>
+          <div id="judge-alerts" class="vertical-list"></div>
+        </section>
+        <section class="card section-gap-md">
+          <h2>Run Queue</h2>
+          <p class="muted">Showing the next 12 registered/staging/queued runs. Use Competitors for the full list and ordering.</p>
+          <div id="queue" class="grid"></div>
+        </section>
+      </section>
+
+      <section id="panel-import" class="panel">
+        <div class="card">
+          <h2>Competitor Import</h2>
+          <p class="notice">Upload CSV or XLSX. Recognised columns include entry number, driver name, car, engine, plate, class, sponsor, notes, and run type.</p>
+          <div class="grid">
+            <label>CSV / Excel file <input id="import-file" type="file" accept=".csv,.xlsx,.xlsm"></label>
+            <div class="align-end"><button id="import-upload" class="btn primary" data-help="Read the selected CSV or Excel file and show a reviewable import preview before saving anything.">Preview Import</button></div>
+          </div>
+          <div id="import-result" class="muted"></div>
+          <div id="import-preview" class="vertical-list"></div>
+          <div id="import-submit-bar" class="card import-submit-bar" style="display:none;">
+            <div>
+              <strong>Ready to finalize reviewed import</strong>
+              <div id="import-submit-summary" class="muted"></div>
+            </div>
+            <button id="commit-import" class="btn good" data-help="Create or update competitors, vehicles, and runs from the reviewed rows. Skipped rows are ignored.">Import Competitors</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-competitors" class="panel">
+        <div class="card">
+          <h2>Competitor Order</h2>
+          <p class="muted">Drag rows into order, or type position numbers and save. This controls the queue used by admin, judges, queue display, and graphics.</p>
+          <div class="btn-row stack-gap-sm">
+            <button id="save-order" class="btn primary" data-help="Save the current competitor order so queue, judging, and graphics all use the same order.">Save Order</button>
+            <button id="renumber-order" class="btn" data-help="Fill the visible order fields sequentially from 1 downward before saving.">Renumber Order</button>
+          </div>
+          <div id="competitor-order"></div>
+        </div>
+        <div class="card section-gap-md">
+          <h2>Manual Competitor Add</h2>
+          <div class="grid tight">
+            <label>Entry # <input id="manual-entry" placeholder="42"></label>
+            <label>Driver <input id="manual-driver" placeholder="Driver name"></label>
+            <label>Class <input id="manual-class" placeholder="Open"></label>
+            <label>Car <input id="manual-car" placeholder="VK Commodore"></label>
+            <label>Engine <input id="manual-engine" placeholder="LS Turbo"></label>
+            <label>Plate <input id="manual-plate" placeholder="ABC123"></label>
+            <label>Run Type
+              <select id="manual-run-type">
+                <option value="competition">Competition</option>
+                <option value="demo">Demo</option>
+                <option value="fun">Fun</option>
+                <option value="exhibition">Exhibition</option>
+                <option value="test">Test</option>
+              </select>
+            </label>
+            <label>Heat <input id="manual-heat" type="number" min="1" value="1"></label>
+          </div>
+          <button id="add-competitor" class="btn primary section-gap-sm" data-help="Create a new competitor, vehicle, assignment, and first run from the manual fields.">Add Competitor</button>
+        </div>
+      </section>
+
+      <section id="panel-criteria" class="panel">
+        <div class="card">
+          <h2>Criteria Builder</h2>
+          <div class="grid tight">
+            <label>Name <input id="crit-name" placeholder="Instant Smoke"></label>
+            <label>Short Label <input id="crit-short" placeholder="Smoke"></label>
+              <label>Type
+                <select id="crit-type">
+                  <option value="numeric_score">Numeric score</option>
+                  <option value="positive_bonus">Positive bonus</option>
+                  <option value="deduction">Deduction</option>
+                  <option value="count_bonus">Count bonus</option>
+                  <option value="count_penalty">Count penalty</option>
+                  <option value="checkbox">Checkbox</option>
+                  <option value="toggle">Toggle</option>
+                </select>
+              </label>
+            <label>Min <input id="crit-min" type="number" value="0"></label>
+            <label>Max <input id="crit-max" type="number" value="10"></label>
+            <label>Step <input id="crit-step" type="number" value="1"></label>
+            <label>Points / Unit <input id="crit-points" type="number" value="1"></label>
+            <label>Order <input id="crit-order" type="number" value="100"></label>
+          </div>
+          <div class="btn-row section-gap-sm">
+            <label><input id="crit-required" type="checkbox"> Required warning</label>
+            <label><input id="crit-negative" type="checkbox"> Allows negative</label>
+            <label><input id="crit-judges" type="checkbox" checked> Judge visible</label>
+            <label><input id="crit-gfx" type="checkbox" checked> Graphics visible</label>
+            <button id="add-criterion" class="btn primary" data-help="Add a new scoring criterion using the fields above. Existing criteria remain editable below.">Add Criterion</button>
+          </div>
+        </div>
+        <div class="card section-gap-md">
+          <h2>Current Criteria</h2>
+          <div id="criteria-list"></div>
+          <div class="notice criterion-math-info section-gap-md">
+            <strong>Scoring type maths</strong>
+            <p class="muted">Numeric score, positive bonus, and count bonus add value x points. Deduction and count penalty subtract value x points. Checkbox and toggle add the points value when on, or 0 when off. Allows negative only controls whether judges can type below zero; deduction types are already negative by design.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-settings" class="panel">
+        <div class="card">
+          <h2>Event Settings</h2>
+          <p class="muted">Use this area for event-level setup that should stay consistent across the landing page, queue, judging, and admin views.</p>
+          <div class="settings-stack">
+            <div class="grid tight">
+              <label>Event name <input id="settings-event-name" placeholder="Kairix Burnout Competition"></label>
+              <label>Venue <input id="settings-venue" placeholder="Venue name"></label>
+              <label>Event date <input id="settings-date" placeholder="2026-05-06"></label>
+              <label>Public delay seconds <input id="settings-public-delay" type="number" min="0" value="0"></label>
+              <label>Heat total scoring mode
+                <select id="settings-result-mode">
+                  <option value="total_of_all_runs">All heats</option>
+                  <option value="best_1_heat">Best 1 heat</option>
+                  <option value="best_2_heats">Best 2 heats</option>
+                  <option value="best_3_heats">Best 3 heats</option>
+                </select>
+              </label>
+            </div>
+            <label class="check">
+              <input id="settings-likeness" type="checkbox">
+              Judge likeness mode available
+            </label>
+            <div class="notice">
+              <strong>Heat scoring / best-of totals</strong>
+              <p class="muted">Use Scoring total mode to choose whether overall results count every heat or only each competitor's best 1, 2, or 3 heats. This setting feeds Results, public queue totals, and graphics scoreboards.</p>
+            </div>
+            <label class="check">
+              <input id="settings-public-total-scores" type="checkbox">
+              Show competitor total scores on public queue displays
+            </label>
+            <label class="check">
+              <input id="settings-graphics-total-scores" type="checkbox">
+              Allow competitor total scores on graphics overlays
+            </label>
+            <label>Landing-page notice
+              <textarea id="settings-landing-notice" rows="4" placeholder="Optional notice shown in the message box at the bottom of the home page. Leave blank to hide it."></textarea>
+            </label>
+            <div class="btn-row settings-actions">
+              <button id="save-settings" class="btn primary" data-help="Save event settings, the landing-page notice, and public delay defaults.">Save Settings</button>
+              <button id="refresh-settings" class="btn" data-help="Reload event settings and active session information from the server.">Refresh Settings</button>
+            </div>
+            <div id="settings-result" class="muted"></div>
+          </div>
+        </div>
+        <div class="card section-gap-md">
+          <h2>Active Sessions</h2>
+          <p class="muted">This shows which judge, graphics, and admin screens are currently connected to the active event.</p>
+          <div id="session-summary" class="session-summary-grid"></div>
+          <div id="session-list" class="settings-stack"></div>
+        </div>
+        <div class="card owner-only danger-zone section-gap-md">
+          <h2>Event Lifecycle</h2>
+          <p class="muted">Archive the current event and create a fresh active event. This logs out existing devices so they reconnect to the new event cleanly.</p>
+          <div class="grid tight">
+            <label>New event name <input id="lifecycle-event-name" placeholder="Burnout Competition"></label>
+            <label>Venue <input id="lifecycle-venue" placeholder="Venue name"></label>
+            <label>Event date <input id="lifecycle-date" placeholder="2026-05-07"></label>
+          </div>
+          <div class="grid tight section-gap-sm">
+            <label class="check"><input id="lifecycle-copy-criteria" type="checkbox" checked> Copy criteria</label>
+            <label class="check"><input id="lifecycle-copy-pins" type="checkbox" checked> Copy PIN accounts</label>
+            <label class="check"><input id="lifecycle-copy-graphics" type="checkbox" checked> Copy graphics layout</label>
+            <label class="check"><input id="lifecycle-copy-notice" type="checkbox"> Copy landing notice</label>
+          </div>
+          <div class="btn-row settings-actions">
+            <button id="archive-event" class="btn danger" data-help="Owner only: archive the current event and create a new active one using the options above.">Archive Current And Create New Event</button>
+          </div>
+          <div id="lifecycle-result" class="muted"></div>
+        </div>
+      </section>
+
+      <section id="panel-scoring" class="panel">
+        <div class="card">
+          <h2>Live Scoring Monitor</h2>
+          <div id="scoring"></div>
+        </div>
+      </section>
+
+      <section id="panel-results" class="panel">
+        <div class="card">
+          <h2>Results Review</h2>
+          <div id="heat-controls" class="btn-row high-admin-link" style="margin-bottom:10px;"></div>
+          <div id="result-view-controls" class="btn-row" style="margin-bottom:10px;"></div>
+          <div id="results"></div>
+        </div>
+      </section>
+
+      <section id="panel-pins" class="panel">
+        <div class="card">
+          <h2>PIN Accounts</h2>
+          <div class="grid">
+            <label>Name <input id="pin-name" placeholder="Judge 3"></label>
+            <label>PIN <input id="pin-value" inputmode="numeric" placeholder="103"></label>
+            <label>Role
+              <select id="pin-role">
+                <option value="judge">Judge</option>
+                <option value="graphics">Graphics</option>
+                <option value="admin">Admin</option>
+                <option value="high_admin">High Admin</option>
+                <option value="owner">Owner</option>
+              </select>
+            </label>
+            <label>Permission Level
+              <select id="pin-level">
+                <option value="1">1 - Judge / Graphics</option>
+                <option value="2">2 - Admin</option>
+                <option value="3">3 - High Admin</option>
+                <option value="4">4 - Owner</option>
+              </select>
+            </label>
+          </div>
+          <button id="add-pin" class="btn primary section-gap-sm" data-help="Owner only: add a new active PIN account for the selected role.">Add PIN</button>
+          <div id="pin-list" class="section-gap-md"></div>
+        </div>
+      </section>
+
+      <section id="panel-owner" class="panel">
+        <div class="card">
+          <h2>Colors / Theme</h2>
+          <p class="muted">Owner-level color controls for the local app screens. These are stored with the graphics/event settings and applied on each page load.</p>
+          <div class="theme-swatch-grid">
+            <label>Background <input id="theme-bg" type="color" value="#f7f7f4"></label>
+            <label>Panel <input id="theme-panel" type="color" value="#ffffff"></label>
+            <label>Main text <input id="theme-ink" type="color" value="#181818"></label>
+            <label>Muted text <input id="theme-muted" type="color" value="#646464"></label>
+            <label>Lines <input id="theme-line" type="color" value="#d9d9d2"></label>
+            <label>Danger/accent <input id="theme-accent" type="color" value="#b91c1c"></label>
+            <label>Good <input id="theme-good" type="color" value="#147a43"></label>
+            <label>Warning <input id="theme-warn" type="color" value="#a15c00"></label>
+            <label>Dark buttons <input id="theme-dark" type="color" value="#121212"></label>
+            <label>Info blue <input id="theme-blue" type="color" value="#175b89"></label>
+          </div>
+          <div class="theme-preview section-gap-sm">
+            <strong>Theme preview</strong>
+            <p class="muted">Buttons and panels will follow these colors after saving.</p>
+            <div class="btn-row"><span class="btn primary inert-control">Primary</span><span class="btn good inert-control">Good</span><span class="btn danger inert-control">Danger</span></div>
+          </div>
+          <div class="btn-row section-gap-sm">
+            <button id="save-theme" class="btn primary" data-help="Save these colors as the active app theme for all devices.">Save Theme</button>
+            <button id="reset-theme" class="btn" data-help="Reset the color fields to the default Kairix colors, then save if you want to apply them.">Reset Theme Values</button>
+          </div>
+        </div>
+        <div class="card section-gap-md">
+          <h2>Backup Health</h2>
+          <p class="muted">Scheduled server backups are written into the Docker backup volume. This is separate from the download button below, so the server keeps a rolling set even if nobody remembers to download one.</p>
+          <div id="backup-health" class="backup-health-grid section-gap-sm"></div>
+          <div class="btn-row section-gap-sm">
+            <button id="refresh-backup-health" class="btn" data-help="Owner only: reload the scheduled backup health, latest backup age, backup folder, and retention count.">Refresh Backup Health</button>
+            <button id="write-server-backup" class="btn primary" data-help="Owner only: write a server-side backup file into the Docker backup volume immediately.">Write Server Backup Now</button>
+          </div>
+        </div>
+        <div class="card section-gap-md">
+          <h2>Judge Backup Re-Import</h2>
+          <p class="muted">Paste judge backup JSON from a phone recovery page. Imported score entries are tagged as judge_device_recovery and kept out of official results until reviewed.</p>
+          <div class="grid tight">
+            <label>Source device
+              <input id="recovery-source-device" placeholder="J3-phone">
+            </label>
+            <label>Recovery JSON
+              <textarea id="recovery-import-raw" rows="8" placeholder='Paste copied backup JSON here'></textarea>
+            </label>
+          </div>
+          <div class="btn-row section-gap-sm">
+            <button id="import-recovery-data" class="btn primary" data-help="Owner only: import pasted judge recovery data as non-official recovery score entries for review.">Import Recovery Data</button>
+            <button id="refresh-recovery-review" class="btn" data-help="Reload recent recovered scores awaiting review.">Refresh Recovery Review</button>
+          </div>
+          <pre id="recovery-import-result" class="muted"></pre>
+          <div id="recovery-review-list" class="vertical-list compact-list"></div>
+        </div>
+        <div class="card section-gap-md">
+          <h2>Local / Cloud Connection</h2>
+          <p class="muted">Clients try the local event server first. If fallback is enabled and the local API cannot be reached, browsers can retry against the cloud URL saved here.</p>
+          <div class="grid">
+            <label>Local server URL
+              <input id="conn-local-url" type="url" placeholder="http://192.168.0.205:7080">
+            </label>
+            <label>Cloud fallback URL
+              <input id="conn-cloud-url" type="url" placeholder="https://example.trycloudflare.com">
+            </label>
+            <label>Health path
+              <input id="conn-health-path" value="/api/health">
+            </label>
+            <label>Request timeout ms
+              <input id="conn-timeout" type="number" min="500" max="15000" step="250" value="2500">
+            </label>
+            <label>Retry local after seconds
+              <input id="conn-retry-local" type="number" min="5" max="600" value="20">
+            </label>
+          </div>
+          <div class="btn-row section-gap-sm">
+            <label class="switch-control" data-help="When enabled, browser API calls can retry against the cloud URL if the local server is unreachable.">
+              <input id="conn-fallback-enabled" type="checkbox">
+              <span class="switch-track" aria-hidden="true"></span>
+              <span>Enable cloud fallback</span>
+            </label>
+            <label class="switch-control" data-help="Prefer the local event server whenever it is reachable. This keeps judge traffic on event Wi-Fi first.">
+              <input id="conn-prefer-local" type="checkbox" checked>
+              <span class="switch-track" aria-hidden="true"></span>
+              <span>Prefer local first</span>
+            </label>
+            <label class="switch-control" data-help="After a cloud fallback, clients may try the local server again later instead of staying on cloud for the whole day.">
+              <input id="conn-auto-return" type="checkbox" checked>
+              <span class="switch-track" aria-hidden="true"></span>
+              <span>Return to local when available</span>
+            </label>
+          </div>
+          <div class="btn-row section-gap-sm">
+            <button id="save-connectivity" class="btn primary" data-help="Owner only: save local and cloud fallback URLs for every browser client.">Save Connection Settings</button>
+            <button id="test-local-connection" class="btn" data-help="Test the configured local server health URL from this browser.">Test Local</button>
+            <button id="test-cloud-connection" class="btn" data-help="Test the configured cloud fallback health URL from this browser.">Test Cloud</button>
+          </div>
+          <pre id="connectivity-result" class="muted"></pre>
+        </div>
+        <div class="card danger-zone">
+          <h2>Owner Tools</h2>
+          <p class="muted">Dangerous actions live here. Backup before clearing anything.</p>
+          <div class="btn-row">
+            <button id="download-backup" class="btn primary" data-help="Owner only: download a JSON backup of managed event data before risky operations.">Download Backup</button>
+            <label>Restore file <input id="restore-file" type="file" accept=".json"></label>
+            <button id="restore-backup" class="btn danger" data-help="Owner only: restore managed tables from the chosen backup file after confirmation prompts.">Restore Backup</button>
+            <button id="clear-db" class="btn danger" data-help="Owner only: clear the current event data after multiple warnings. Default seed PINs are recreated.">Clear Event Data</button>
+          </div>
+          <pre id="owner-result" class="muted"></pre>
+        </div>
+      </section>
+
+      <section id="panel-database" class="panel">
+        <div class="card danger-zone">
+          <h2>Database</h2>
+          <p class="muted">Owner-only inspection and cleanup tools. These are for fixing event-day data state, not normal judging flow.</p>
+          <div class="btn-row">
+            <button id="refresh-db" class="btn primary" data-help="Reload row counts for each managed database table. This does not change data.">Refresh Counts</button>
+            <button id="cleanup-scoring" class="btn" data-help="Clears any old accidental 'scoring' states on non-current runs. It does not delete competitors or runs.">Clear Scoring State</button>
+            <button id="cleanup-all-runs" class="btn danger" data-help="Clears queue/staging/on-pad/delayed states from every non-current unfinished run. Use when event-flow state is messy after testing.">Clear Non-current States</button>
+          </div>
+          <div id="db-summary" class="section-gap-md"></div>
+        </div>
+        <div class="card section-gap-md">
+          <h2>Table Viewer</h2>
+          <div class="grid tight">
+            <label>Table <select id="db-table-select"></select></label>
+            <label>Limit <input id="db-table-limit" type="number" value="100" min="1" max="500"></label>
+            <div class="align-end"><button id="load-db-table" class="btn" data-help="Load the selected database table into the viewer without changing any data.">Load Rows</button></div>
+          </div>
+          <div id="db-table-output" class="section-gap-md" style="overflow:auto;"></div>
+        </div>
+      </section>
+    </main>
+    <script src="/static/js/common.js"></script>
+    <script>
+      const adminState = {
+        session: Kairix.requireRole(["admin", "high_admin", "owner"]),
+        currentRun: null,
+        latestEventState: null,
+        editingRuns: new Set(),
+        orderDirty: false,
+        orderEditingUntil: 0,
+        selectedHeat: null,
+        resultView: "cards",
+        pendingHeat: null,
+        heatArmedUntil: 0,
+        latestDelay: null,
+        openScoreDetails: new Set(),
+        openResultDetails: new Set(),
+        openJudgeResultDetails: new Set(),
+        openAdjustments: new Set(),
+        adjustmentDrafts: new Map(),
+        judgeAlertsCollapsed: localStorage.getItem("kairix_judge_alerts_collapsed") === "true",
+        scoreEntryCache: new Map(),
+        issueAlertCache: new Map(),
+        changeAlertCache: new Map(),
+        alertsLoaded: false,
+        seenAlertIds: new Set(),
+      };
+      const CRITERION_TYPES = [
+        ["numeric_score", "Numeric score"],
+        ["positive_bonus", "Positive bonus"],
+        ["deduction", "Deduction"],
+        ["count_bonus", "Count bonus"],
+        ["count_penalty", "Count penalty"],
+        ["checkbox", "Checkbox"],
+        ["toggle", "Toggle"],
+      ];
+      Kairix.validateSession(adminState.session, ["admin", "high_admin", "owner"]).catch(() => {});
+      function isInvalidSessionError(value) {
+        const text = String(value?.message || value || "");
+        return text.includes("Invalid session") || text.includes('"detail":"Invalid session"') || text.includes("401");
+      }
+      function handleSessionError(error) {
+        if (!isInvalidSessionError(error)) return false;
+        localStorage.removeItem("kairix_session");
+        alert("Your admin login session has expired. Please enter your PIN again.");
+        window.location.href = "/";
+        return true;
+      }
+      function roleDisplay(role) {
+        return {
+          admin: "Event Control",
+          high_admin: "High Admin",
+          owner: "Owner",
+          graphics: "Graphics",
+          judge: "Judge",
+        }[role] || role;
+      }
+
+      function criterionTypeOptions(selected) {
+        return CRITERION_TYPES.map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`).join("");
+      }
+
+      document.getElementById("who").textContent = `${adminState.session.display_name} / ${roleDisplay(adminState.session.role)}`;
+      if (adminState.session.role !== "owner") {
+        document.querySelectorAll(".owner-only").forEach(item => item.style.display = "none");
+      }
+      if (!["high_admin", "owner"].includes(adminState.session.role)) {
+        document.querySelectorAll(".high-admin-only").forEach(item => item.style.display = "none");
+        document.querySelectorAll(".high-admin-link").forEach(item => item.style.display = "none");
+      }
+      document.querySelectorAll(".tab-cluster").forEach(cluster => {
+        const visibleButtons = [...cluster.querySelectorAll(".tab")].filter(button => button.style.display !== "none");
+        if (!visibleButtons.length) cluster.style.display = "none";
+      });
+
+      function activateTab(tabName) {
+        document.querySelectorAll(".tab").forEach(item => item.classList.toggle("active", item.dataset.tab === tabName));
+        document.querySelectorAll(".panel").forEach(item => item.classList.toggle("active", item.id === `panel-${tabName}`));
+      }
+
+      document.querySelectorAll(".tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+          activateTab(tab.dataset.tab);
+        });
+      });
+
+      document.body.addEventListener("toggle", event => {
+        const detail = event.target;
+        if (!detail || detail.tagName !== "DETAILS") return;
+        rememberDetail(adminState.openScoreDetails, detail.dataset.scoreDetail, detail.open);
+        rememberDetail(adminState.openResultDetails, detail.dataset.resultDetail, detail.open);
+        rememberDetail(adminState.openJudgeResultDetails, detail.dataset.judgeResultDetail, detail.open);
+      }, true);
+
+      function scoreValue(value) {
+        if (value === null || value === undefined || value === "") return "blank";
+        const number = Number(value);
+        if (!Number.isFinite(number)) return escapeHtml(value);
+        return Number.isInteger(number) ? String(number) : number.toFixed(2);
+      }
+
+      function scoreItemTable(items = []) {
+        if (!items.length) return `<p class="muted">No item-level scoring has been recorded for this entry yet.</p>`;
+        return `
+          <table class="table score-breakdown-table">
+            <thead><tr><th>Item</th><th>Value</th><th>Points</th></tr></thead>
+            <tbody>
+              ${items.map(item => `
+                <tr>
+                  <td>${escapeHtml(item.short_label || item.criterion_name)}</td>
+                  <td>${item.value === null || item.intentionally_blank ? "<span class='muted'>blank</span>" : scoreValue(item.value)}</td>
+                  <td>${item.calculated_points === null || item.calculated_points === undefined ? "<span class='muted'>blank</span>" : scoreValue(item.calculated_points)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      function canAdjustScores() {
+        return ["high_admin", "owner"].includes(adminState.session.role);
+      }
+
+      function scoreWasAdjusted(entry = {}) {
+        return Boolean(entry.original_score_entry_id) || ["high_admin_override", "owner_override"].includes(entry.source_type);
+      }
+
+      function adjustmentMarkerHtml(item = {}, options = {}) {
+        const adjusted = Boolean(item.has_adjustments) || scoreWasAdjusted(item);
+        if (!adjusted) return "";
+        const notes = item.adjustment_notes || [item.reason].filter(Boolean);
+        const title = notes.length ? notes.join("; ") : "Score has an audit-tracked adjustment";
+        return `
+          <span class="adjustment-flag" title="${escapeHtml(title)}">
+            <span class="adjustment-dot" aria-hidden="true"></span>
+            ${options.compact ? "" : "<span>Adjusted</span>"}
+          </span>
+        `;
+      }
+
+      function scoreAdjustmentButton(entry, key) {
+        return `
+          <button class="btn compact" type="button" data-toggle-adjustment="${escapeHtml(key)}" data-help="Open all score fields for an audit-tracked scoring adjustment.">
+            Adjust Scoring
+          </button>
+        `;
+      }
+
+      function scoreAdjustmentPanel(entry, key, options = {}) {
+        const open = adminState.openAdjustments.has(key);
+        const draft = adminState.adjustmentDrafts.get(key) || {};
+        const draftValues = draft.values || {};
+        const draftBlanks = draft.blanks || {};
+        const defaultReason = draft.reason ?? options.defaultReason ?? "";
+        return `
+          <div class="score-adjustment-panel ${open ? "open" : ""}" data-adjustment-panel="${escapeHtml(key)}">
+            <div class="score-adjustment-head">
+              <strong>Adjust scoring</strong>
+              <span class="muted">${escapeHtml(entry.competitor || "Score entry")} · ${escapeHtml(entry.judge_name || "Judge")}</span>
+            </div>
+            <label>Audit note
+              <textarea data-adjustment-reason rows="2" placeholder="What changed and why">${escapeHtml(defaultReason)}</textarea>
+            </label>
+            <div class="score-adjustment-grid">
+              ${(entry.items || []).map(item => {
+                const criterionKey = String(item.criterion_id);
+                const value = Object.prototype.hasOwnProperty.call(draftValues, criterionKey)
+                  ? draftValues[criterionKey]
+                  : item.value === null || item.intentionally_blank ? "" : item.value;
+                const blank = Object.prototype.hasOwnProperty.call(draftBlanks, criterionKey)
+                  ? draftBlanks[criterionKey]
+                  : item.value === null || item.intentionally_blank;
+                return `
+                  <div class="score-adjustment-field">
+                    <label>${escapeHtml(item.short_label || item.criterion_name)}
+                      <input type="number" inputmode="numeric" step="1" data-adjustment-criterion="${item.criterion_id}" value="${escapeHtml(value ?? "")}" placeholder="blank">
+                    </label>
+                    <label class="check compact-check">
+                      <input type="checkbox" data-adjustment-blank="${item.criterion_id}" ${blank ? "checked" : ""}>
+                      <span>Blank</span>
+                    </label>
+                    <span class="muted">Original ${item.value === null || item.intentionally_blank ? "blank" : scoreValue(item.value)}</span>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+            <div class="btn-row compact-actions adjustment-save-row">
+              <button class="btn compact primary" type="button" data-submit-adjustment="${escapeHtml(key)}" data-entry-id="${entry.id}" ${options.changeRequestId ? `data-change-request-id="${options.changeRequestId}"` : ""} data-help="Save this as the official adjusted score and preserve the original for audit.">Save Adjustment</button>
+              <span class="adjustment-save-status muted" data-adjustment-status>Original score stays in audit; saved adjustment becomes official.</span>
+              <button class="btn compact" type="button" data-cancel-adjustment="${escapeHtml(key)}">Close</button>
+            </div>
+          </div>
+        `;
+      }
+
+      function findAdjustmentPanel(source, key) {
+        const scope = source.closest(".score-entry-card, .alert-row, .result-card, .card") || document;
+        const scoped = [...scope.querySelectorAll("[data-adjustment-panel]")].find(panel => panel.dataset.adjustmentPanel === key);
+        if (scoped) return scoped;
+        return [...document.querySelectorAll("[data-adjustment-panel]")].find(panel => panel.dataset.adjustmentPanel === key);
+      }
+
+      function rememberAdjustmentDraft(panel) {
+        if (!panel?.dataset?.adjustmentPanel) return;
+        const values = {};
+        const blanks = {};
+        panel.querySelectorAll("[data-adjustment-criterion]").forEach(input => {
+          const criterionId = String(input.dataset.adjustmentCriterion);
+          values[criterionId] = input.value;
+          blanks[criterionId] = Boolean(panel.querySelector(`[data-adjustment-blank="${criterionId}"]`)?.checked);
+        });
+        adminState.adjustmentDrafts.set(panel.dataset.adjustmentPanel, {
+          reason: panel.querySelector("[data-adjustment-reason]")?.value || "",
+          values,
+          blanks,
+        });
+      }
+
+      function adjustmentEditActive() {
+        return Boolean(document.activeElement?.closest?.("[data-adjustment-panel]"));
+      }
+
+      function detailOpenAttr(openSet, key, fallback = false) {
+        return fallback || openSet.has(key) ? "open" : "";
+      }
+
+      function rememberDetail(openSet, key, isOpen) {
+        if (!key) return;
+        if (isOpen) {
+          openSet.add(key);
+        } else {
+          openSet.delete(key);
+        }
+      }
+
+      function scoreEntryCard(entry, options = {}) {
+        adminState.scoreEntryCache.set(String(entry.id), entry);
+        const key = options.key || `score-${entry.id}`;
+        const open = detailOpenAttr(adminState.openScoreDetails, key, Boolean(options.open));
+        const statusClass = entry.status === "submitted" ? "good-pill" : entry.status === "draft" ? "warn-pill" : "";
+        const subtitle = options.subtitle || `${entry.source_type || "judge_submission"} · ${entry.device_id || "no device"}`;
+        const classes = ["score-entry-card", options.compact ? "compact-score-card" : ""].filter(Boolean).join(" ");
+        const canOverride = canAdjustScores() && entry.status === "submitted";
+        const adjustmentKey = `${key}-adjustment`;
+        return `
+          <details class="${classes}" data-score-detail="${escapeHtml(key)}" ${open}>
+            <summary>
+              <div>
+                <strong>${escapeHtml(options.title || entry.judge_name || "Judge")}</strong>
+                <span class="muted">${escapeHtml(subtitle)}</span>
+              </div>
+              <div class="summary-pill-row">
+                <span class="status-pill ${statusClass}">${escapeHtml(entry.status || "unknown")}</span>
+                ${adjustmentMarkerHtml(entry)}
+                <span class="status-pill">Total ${scoreValue(entry.total)}</span>
+              </div>
+            </summary>
+            ${scoreItemTable(entry.items || [])}
+            ${canOverride ? `
+              <div class="btn-row section-gap-sm">
+                ${scoreAdjustmentButton(entry, adjustmentKey)}
+              </div>
+              ${scoreAdjustmentPanel(entry, adjustmentKey)}
+            ` : ""}
+          </details>
+        `;
+      }
+
+      function criteriaTotalsHtml(totals = []) {
+        if (!totals.length) return `<p class="muted">No submitted item totals yet.</p>`;
+        return `
+          <div class="criterion-total-grid">
+            ${totals.map(item => `
+              <div class="criterion-total-card">
+                <span>${escapeHtml(item.short_label || item.criterion_name)}</span>
+                <strong>${scoreValue(item.total_points)}</strong>
+                <em>${item.entered_count || 0} entered${item.blank_count ? ` · ${item.blank_count} blank` : ""}</em>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderScoring(scoring) {
+        const currentName = scoring.current_run ? Kairix.formatRun(scoring.current_run) : "No current run";
+        const judgeStatuses = scoring.judge_statuses || [];
+        document.getElementById("scoring").innerHTML = `
+          <div class="score-monitor-head">
+            <div>
+              <h3>Current Run</h3>
+              <p class="muted">${escapeHtml(currentName)}</p>
+            </div>
+            <span class="status-pill">Heat ${scoring.current_run?.heat_number || adminState.latestEventState?.current_heat || 1}</span>
+          </div>
+          <div class="judge-submission-grid">
+            ${judgeStatuses.length ? judgeStatuses.map(judge => `
+              <div class="judge-submission-card ${judge.score_status === "submitted" ? "submitted" : judge.score_status === "draft" ? "draft" : "missing"}">
+                <strong>${escapeHtml(judge.judge_name)}</strong>
+                <span>${escapeHtml(judge.score_status || "missing")}</span>
+                <em>${judge.last_seen_at ? "online today" : "not seen"}</em>
+              </div>
+            `).join("") : '<p class="muted">No active judges are configured yet.</p>'}
+          </div>
+          <div class="score-entry-list">
+            ${scoring.scores?.length ? scoring.scores.map(entry => scoreEntryCard(entry, { key: `current-score-${entry.id}` })).join("") : '<p class="muted">No judge scores received for current run yet.</p>'}
+          </div>
+          <div class="score-monitor-head section-gap-md">
+            <div>
+              <h3>Recent Score Activity</h3>
+              <p class="muted">Drafts and submissions across the current event.</p>
+            </div>
+          </div>
+          <div class="score-entry-list">
+            ${scoring.recent_scores?.length ? scoring.recent_scores.map(entry => scoreEntryCard(entry, {
+              key: `recent-score-${entry.id}`,
+              title: entry.competitor || `Run ${entry.run_id}`,
+              subtitle: `Heat ${entry.heat_number || 1} · ${entry.judge_name || "Judge"} · ${entry.status || "unknown"}`,
+              compact: true,
+            })).join("") : '<p class="muted">No recent score activity yet.</p>'}
+          </div>
+        `;
+      }
+
+      function updateJudgeAlertCollapse() {
+        const card = document.querySelector(".judge-alert-card");
+        const button = document.getElementById("toggle-judge-alerts");
+        if (!card || !button) return;
+        card.classList.toggle("collapsed", adminState.judgeAlertsCollapsed);
+        button.textContent = adminState.judgeAlertsCollapsed ? "Expand" : "Collapse";
+        button.setAttribute("aria-expanded", String(!adminState.judgeAlertsCollapsed));
+        localStorage.setItem("kairix_judge_alerts_collapsed", String(adminState.judgeAlertsCollapsed));
+      }
+
+      function renderJudgeAlerts(alerts) {
+        const issues = alerts.issues || [];
+        const changes = alerts.score_change_requests || [];
+        adminState.issueAlertCache = new Map(issues.map(item => [String(item.id), item]));
+        adminState.changeAlertCache = new Map(changes.map(item => [String(item.id), item]));
+        changes.forEach(item => {
+          if (item.original_score) adminState.scoreEntryCache.set(String(item.original_score.id), item.original_score);
+        });
+        const total = Number(alerts.counts?.total || issues.length + changes.length);
+        document.getElementById("judge-alert-count").textContent = `${total} open`;
+        document.querySelector(".judge-alert-card")?.classList.toggle("attention-card", total > 0);
+        updateJudgeAlertCollapse();
+        const alertIds = [
+          ...issues.map(item => `issue-${item.id}`),
+          ...changes.map(item => `change-${item.id}`),
+        ];
+        const newIds = alertIds.filter(id => !adminState.seenAlertIds.has(id));
+        if (adminState.alertsLoaded && newIds.length) {
+          alert(`New judge alert${newIds.length > 1 ? "s" : ""} received.`);
+        }
+        alertIds.forEach(id => adminState.seenAlertIds.add(id));
+        adminState.alertsLoaded = true;
+        document.getElementById("judge-alerts").innerHTML = total ? `
+          ${issues.map(report => `
+            <div class="alert-row">
+              <div>
+                <strong>${escapeHtml(report.judge_name)} reported ${escapeHtml(report.issue_type)}</strong>
+                <span class="muted">${escapeHtml(report.competitor || "No run selected")} · ${escapeHtml(report.note || "No note")}</span>
+              </div>
+              <div class="btn-row compact-actions">
+                <button class="btn compact" data-issue-status="${report.id}:acknowledged" data-help="Mark this judge issue report as acknowledged so event control knows it has been seen.">Acknowledge</button>
+                <button class="btn compact primary" data-issue-delay="${report.id}" data-help="Create an official delay from this judge issue report, then mark the report actioned.">Make Delay</button>
+                <button class="btn compact" data-issue-status="${report.id}:dismissed" data-help="Dismiss this report without changing event state. The report remains in the audit trail.">Dismiss</button>
+              </div>
+            </div>
+          `).join("")}
+          ${changes.map(request => {
+            const canAdjustRequest = request.original_score && canAdjustScores();
+            const adjustmentKey = `change-${request.id}-${request.original_score_entry_id}`;
+            return `
+              <div class="alert-row score-change-alert">
+                <div>
+                  <strong>${escapeHtml(request.judge_name)} requested score change</strong>
+                  <span class="muted">${escapeHtml(request.competitor || "Unknown run")} · ${escapeHtml(request.reason || "No reason")}</span>
+                  <small class="muted">Requested while current was ${escapeHtml(Kairix.formatRun(request.current_run_at_request) || "unknown")}</small>
+                </div>
+                <div class="btn-row compact-actions">
+                  ${canAdjustRequest ? scoreAdjustmentButton(request.original_score, adjustmentKey) : ""}
+                  <button class="btn compact primary" data-change-status="${request.id}:resolved_manually" data-help="Mark this score change request as handled manually after an admin/high-admin action.">Mark Actioned</button>
+                  <button class="btn compact" data-change-status="${request.id}:rejected" data-help="Reject this score change request. The original judge score remains unchanged.">Reject</button>
+                </div>
+                ${canAdjustRequest ? scoreAdjustmentPanel(request.original_score, adjustmentKey, {
+                  changeRequestId: request.id,
+                  defaultReason: `Score change request #${request.id}: ${request.reason || "judge requested adjustment"}`,
+                }) : ""}
+              </div>
+            `;
+          }).join("")}
+        ` : '<p class="muted">No open judge alerts right now.</p>';
+      }
+
+      function renderRunHeatControl(state) {
+        const live = document.getElementById("control-heat-live");
+        if (!live) return;
+        const currentHeat = Number(state?.current_heat || 1);
+        const nextHeat = currentHeat + 1;
+        const armed = adminState.pendingHeat === nextHeat && Date.now() < adminState.heatArmedUntil;
+        live.textContent = `Active heat ${currentHeat}`;
+        document.getElementById("control-heat-next").textContent = armed
+          ? `Armed for Heat ${nextHeat}. Confirm before it times out.`
+          : `Next heat will be Heat ${nextHeat}.`;
+        const arm = document.getElementById("arm-next-heat");
+        const confirm = document.getElementById("confirm-next-heat");
+        arm.disabled = false;
+        arm.textContent = `Arm Heat ${nextHeat}`;
+        confirm.disabled = !armed;
+        confirm.textContent = armed ? `Confirm Heat ${nextHeat}` : "Confirm Next Heat";
+      }
+
+      function renderResults(results) {
+        const heats = results.heats?.length ? results.heats : [results.current_heat || 1];
+        adminState.selectedHeat = adminState.selectedHeat || results.current_heat || 1;
+        if (!heats.map(Number).includes(Number(adminState.selectedHeat))) {
+          adminState.selectedHeat = results.current_heat || heats[0] || 1;
+        }
+        const heatRows = results.results.filter(row => Number(row.heat_number || 1) === Number(adminState.selectedHeat));
+        document.getElementById("heat-controls").innerHTML = `
+          <span class="status-pill">Current heat: ${results.current_heat || 1}</span>
+          ${heats.map(heat => `<button class="btn compact ${Number(heat) === Number(adminState.selectedHeat) ? "active-state" : ""}" data-select-heat="${heat}" data-help="Show results for heat ${heat}.">Heat ${heat}</button>`).join("")}
+          ${["high_admin", "owner"].includes(adminState.session.role) ? `<button class="btn compact primary" data-set-current-heat="${adminState.selectedHeat}" data-help="Set the selected heat as the active event heat after a confirmation prompt.">Make Active Heat</button>` : ""}
+        `;
+        document.getElementById("result-view-controls").innerHTML = `
+          <button class="btn compact ${adminState.resultView === "overall" ? "active-state" : ""}" data-result-view="overall" data-help="Show overall competitor totals using the selected scoring mode.">Overall Totals</button>
+          <button class="btn compact ${adminState.resultView === "cards" ? "active-state" : ""}" data-result-view="cards" data-help="Show one expandable box per competitor, with judge-by-judge details inside.">Competitor Cards</button>
+          <button class="btn compact ${adminState.resultView === "judges" ? "active-state" : ""}" data-result-view="judges" data-help="Show results grouped by judge, so you can review what each judge scored across this heat.">By Judge</button>
+          <button class="btn compact ${adminState.resultView === "table" ? "active-state" : ""}" data-result-view="table" data-help="Show a compact summary table for the selected heat.">Summary Table</button>
+        `;
+        document.getElementById("results").innerHTML = adminState.resultView === "overall"
+          ? renderOverallResults(results.overall_results || [], results.result_mode_label)
+          : adminState.resultView === "table"
+          ? renderResultsTable(heatRows)
+          : adminState.resultView === "judges"
+            ? renderJudgeResults(heatRows)
+            : renderResultCards(heatRows);
+      }
+
+      function renderOverallResults(rows, modeLabel) {
+        if (!rows.length) return `<p class="muted">No submitted competitor totals yet.</p>`;
+        return `
+          <table class="table">
+            <thead><tr><th>Pos</th><th>Competitor</th><th>Vehicle</th><th>Mode</th><th>Counted Heats</th><th>Total</th></tr></thead>
+            <tbody>
+              ${rows.map(row => `
+                <tr>
+                  <td>${row.position || ""}</td>
+                  <td>#${escapeHtml(row.entry_number)} ${escapeHtml(row.driver_name)}</td>
+                  <td>${escapeHtml(row.vehicle_name || "")}</td>
+                  <td>${escapeHtml(modeLabel || row.result_mode_label || "All heats")}</td>
+                  <td>${row.counted_heat_count || 0}</td>
+                  <td>${scoreValue(row.total)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      function renderResultsTable(rows) {
+        if (!rows.length) return `<p class="muted">No competitors are assigned to this heat yet.</p>`;
+        return `<table class="table"><thead><tr><th>Heat</th><th>Competitor</th><th>Vehicle</th><th>Type</th><th>State</th><th>Scores</th><th>Total</th><th>Changed</th></tr></thead><tbody>${rows.map(row => `<tr class="${row.has_adjustments ? "adjusted-result-row" : ""}"><td>${row.heat_number || 1}</td><td>${escapeHtml(row.competitor)}</td><td>${escapeHtml(row.vehicle)}</td><td>${escapeHtml(row.run_type)}</td><td>${escapeHtml(row.state || "not assigned")}</td><td>${row.submitted_scores}</td><td>${scoreValue(row.total)}</td><td>${adjustmentMarkerHtml(row, { compact: true }) || "<span class='muted'>-</span>"}</td></tr>`).join("")}</tbody></table>`;
+      }
+
+      function renderResultCards(rows) {
+        if (!rows.length) return `<p class="muted">No competitors are assigned to this heat yet.</p>`;
+        return `
+          <div class="result-card-list">
+            ${rows.map(row => {
+              const key = `result-run-${row.run_id}`;
+              return `
+              <details class="result-card ${row.has_adjustments ? "adjusted-result-card" : ""}" data-result-detail="${escapeHtml(key)}" ${detailOpenAttr(adminState.openResultDetails, key)}>
+                <summary class="result-summary-row">
+                  <div>
+                    <strong class="result-title-line">${escapeHtml(row.competitor)} ${adjustmentMarkerHtml(row, { compact: true })}</strong>
+                    <span class="muted">${escapeHtml(row.vehicle || "Vehicle TBC")} · ${escapeHtml(row.run_type || "competition")} · ${escapeHtml(row.state || "not assigned")}</span>
+                  </div>
+                  <div class="summary-pill-row">
+                    <span class="status-pill">Heat ${row.heat_number || 1}</span>
+                    <span class="status-pill">${row.submitted_scores || 0} scores</span>
+                    ${row.has_adjustments ? `<span class="status-pill warn-pill">Adjusted</span>` : ""}
+                    <span class="status-pill good-pill">Total ${scoreValue(row.total)}</span>
+                  </div>
+                </summary>
+                ${row.has_adjustments ? `<div class="adjustment-note-row">${adjustmentMarkerHtml(row)}<span>${escapeHtml((row.adjustment_notes || []).join("; ") || "Audit-tracked scoring adjustment")}</span></div>` : ""}
+                <div class="result-detail-grid">
+                  <div>
+                    <h3>Judge Submissions</h3>
+                    <div class="score-entry-list">
+                      ${row.entries?.length ? row.entries.map(entry => scoreEntryCard(entry, { compact: true })).join("") : '<p class="muted">No submitted judge scores yet.</p>'}
+                    </div>
+                  </div>
+                  <div>
+                    <h3>Criterion Totals</h3>
+                    ${criteriaTotalsHtml(row.criteria_totals || [])}
+                  </div>
+                </div>
+              </details>
+            `;}).join("")}
+          </div>
+        `;
+      }
+
+      function renderJudgeResults(rows) {
+        const judges = new Map();
+        rows.forEach(row => {
+          (row.entries || []).forEach(entry => {
+            const key = entry.judge_id ? `judge-${entry.judge_id}` : `source-${entry.source_type || "unknown"}`;
+            if (!judges.has(key)) {
+              judges.set(key, {
+                key,
+                name: entry.judge_name || entry.source_type || "Unknown source",
+                entries: [],
+                total: 0,
+              });
+            }
+            const judge = judges.get(key);
+            judge.entries.push({ row, entry });
+            judge.total += Number(entry.total || 0);
+          });
+        });
+        const judgeList = [...judges.values()].sort((a, b) => a.name.localeCompare(b.name));
+        if (!judgeList.length) return `<p class="muted">No submitted judge scores for this heat yet.</p>`;
+        return `
+          <div class="result-card-list">
+            ${judgeList.map(judge => {
+              const key = `judge-result-${judge.key}`;
+              return `
+                <details class="result-card" data-judge-result-detail="${escapeHtml(key)}" ${detailOpenAttr(adminState.openJudgeResultDetails, key)}>
+                  <summary class="result-summary-row">
+                    <div>
+                      <strong>${escapeHtml(judge.name)}</strong>
+                      <span class="muted">${judge.entries.length} score entries in Heat ${adminState.selectedHeat}</span>
+                    </div>
+                    <span class="status-pill">Judge View</span>
+                    <span class="status-pill good-pill">Total ${scoreValue(judge.total)}</span>
+                  </summary>
+                  <div class="score-entry-list judge-result-list">
+                    ${judge.entries.map(({ row, entry }) => scoreEntryCard(entry, {
+                      key: `judge-score-${entry.id}`,
+                      title: `${row.competitor} - ${row.vehicle || "Vehicle TBC"}`,
+                      subtitle: `${row.run_type || "competition"} · ${row.state || "not assigned"} · ${entry.status || "unknown"}`,
+                      compact: true,
+                    })).join("")}
+                  </div>
+                </details>
+              `;
+            }).join("")}
+          </div>
+        `;
+      }
+
+      async function refresh(options = {}) {
+        const keepAdjustmentFormStable = !options.forceAdjustmentRefresh && adjustmentEditActive();
+        const state = await Kairix.getEventState({ preferCache: false });
+        adminState.latestEventState = state;
+        adminState.currentRun = state.current_run;
+        document.getElementById("current").innerHTML = `<strong>${Kairix.formatRun(state.current_run)}</strong><br><span class="muted">${state.current_run?.run_type || ""} / ${state.current_run?.state || "not assigned"}</span>`;
+        document.querySelectorAll("[data-state]").forEach(button => {
+          const currentState = state.current_run?.state || "";
+          const target = button.dataset.state === "none" ? "" : button.dataset.state;
+          button.classList.toggle("active-state", currentState === target);
+        });
+        document.querySelectorAll("[data-current-run-type]").forEach(button => {
+          button.classList.toggle("active-state", state.current_run?.run_type === button.dataset.currentRunType);
+          button.disabled = !state.current_run;
+        });
+        adminState.latestDelay = state.delay ? { ...state.delay, fetched_at_ms: Date.now() } : null;
+        const delayText = state.delay ? `${state.delay.message} - ${state.delay.countdown_text || ""}` : "No active delay";
+        const currentSummary = state.current_run ? Kairix.formatRun(state.current_run) : "No current run";
+        const upNextSummary = state.actual_up_next_run ? Kairix.formatRun(state.actual_up_next_run) : "No up-next run";
+        document.getElementById("summary-event").textContent = [state.event?.name, state.event?.venue, state.event?.event_date].filter(Boolean).join(" / ") || "Active event";
+        document.getElementById("summary-current").textContent = currentSummary;
+        document.getElementById("summary-up-next").textContent = upNextSummary;
+        document.getElementById("summary-heat").textContent = `Heat ${state.current_heat || 1}`;
+        renderRunHeatControl(state);
+        renderAdminDelayReadout();
+        updateTimerFromState(state.timer);
+
+        const queue = await Kairix.getQueue();
+        document.getElementById("queue").className = "vertical-list";
+        document.getElementById("queue").innerHTML = queue.runs
+          .filter(run => !["finished", "skipped", "withdrawn"].includes(run.state))
+          .slice(0, 12)
+          .map(run => {
+            const isCurrent = state.current_run?.id === run.id;
+            const isUpNext = state.actual_up_next_run?.id === run.id;
+            return `
+          <div class="queue-list-row admin-run-row ${isCurrent ? "current-run-highlight" : ""} ${isUpNext ? "featured-run-highlight" : ""}">
+            <div>
+              <strong>${Kairix.formatRun(run)}</strong>
+              <span>${run.state || "not assigned"} / ${run.run_type}</span>
+              <div class="mini-badges">
+                ${isCurrent ? '<em>CURRENT</em>' : ""}
+                ${isUpNext ? '<em>UP NEXT</em>' : ""}
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn primary ${isCurrent ? "active-state" : ""}" data-current="${run.id}" data-help="Make this run the official current competitor for judges, queue displays, and event control.">Set Current</button>
+            </div>
+          </div>
+        `;
+          }).join("");
+
+        const scoring = await Kairix.API.get(`/api/admin/live-scoring?session_id=${adminState.session.session_id}`);
+        if (!keepAdjustmentFormStable) renderScoring(scoring);
+
+        const alerts = await Kairix.API.get(`/api/admin/judge-alerts?session_id=${adminState.session.session_id}`);
+        if (!keepAdjustmentFormStable) renderJudgeAlerts(alerts);
+
+        if (adminState.session.role === "owner") {
+          const pins = await Kairix.API.get(`/api/admin/pin-accounts?session_id=${adminState.session.session_id}`);
+          document.getElementById("pin-list").innerHTML = pins.accounts.map(account => `
+          <div class="card" data-pin-row="${account.id}">
+            <div class="grid tight">
+              <label>Name <input data-pin-field="display_name" value="${escapeHtml(account.display_name)}"></label>
+              <label>PIN <input data-pin-field="pin" inputmode="numeric" value="${escapeHtml(account.pin)}"></label>
+              <label>Role
+                <select data-pin-field="role">
+                  ${["judge", "graphics", "admin", "high_admin", "owner"].map(role => `<option value="${role}" ${account.role === role ? "selected" : ""}>${role}</option>`).join("")}
+                </select>
+              </label>
+              <label>Level
+                <select data-pin-field="permission_level">
+                  ${[1, 2, 3, 4].map(level => `<option value="${level}" ${account.permission_level === level ? "selected" : ""}>${level}</option>`).join("")}
+                </select>
+              </label>
+              <label><input data-pin-field="active" type="checkbox" ${account.active ? "checked" : ""}> Active</label>
+            </div>
+            <div class="btn-row section-gap-sm">
+              <button class="btn primary" data-save-pin="${account.id}" data-help="Save this person's name, PIN, role, permission level, and active status.">Save</button>
+              <button class="btn danger" data-delete-pin="${account.id}" data-help="Disable this PIN account and any active sessions. Old records remain linked for audit.">Deactivate</button>
+            </div>
+          </div>
+        `).join("");
+        }
+
+        const results = await Kairix.API.get(`/api/admin/results?session_id=${adminState.session.session_id}`);
+        if (!keepAdjustmentFormStable) renderResults(results);
+
+        await refreshCriteria();
+        await refreshCompetitors();
+        hydrateThemeControls(state.graphics?.layout_config?.theme || {});
+        if (["high_admin", "owner"].includes(adminState.session.role)) {
+          await refreshSettingsPanel();
+        }
+      }
+
+      function setSettingsStatus(message, className = "muted") {
+        const target = document.getElementById("settings-result");
+        target.className = className;
+        target.textContent = message;
+      }
+
+      function formatSessionAge(seconds) {
+        if (seconds < 60) return `${seconds}s ago`;
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        return `${hours}h ago`;
+      }
+
+      function shortIdentifier(value) {
+        const text = String(value || "");
+        if (!text) return "no device";
+        return text.length > 14 ? `...${text.slice(-10)}` : text;
+      }
+
+      function formatSessionTime(value) {
+        if (!value) return "unknown";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      }
+
+      async function refreshSettingsPanel() {
+        const [settings, sessions] = await Promise.all([
+          Kairix.API.get(`/api/admin/settings?session_id=${adminState.session.session_id}`),
+          Kairix.API.get(`/api/admin/sessions/active?session_id=${adminState.session.session_id}`),
+        ]);
+        const event = settings.event || {};
+        const config = settings.settings || {};
+        if (document.activeElement !== document.getElementById("settings-event-name")) {
+          document.getElementById("settings-event-name").value = event.name || "";
+        }
+        if (document.activeElement !== document.getElementById("settings-venue")) {
+          document.getElementById("settings-venue").value = event.venue || "";
+        }
+        if (document.activeElement !== document.getElementById("settings-date")) {
+          document.getElementById("settings-date").value = event.event_date || "";
+        }
+        if (document.activeElement !== document.getElementById("settings-public-delay")) {
+          document.getElementById("settings-public-delay").value = config.public_delay_seconds ?? 0;
+        }
+        if (document.activeElement !== document.getElementById("settings-result-mode")) {
+          document.getElementById("settings-result-mode").value = config.result_mode || "total_of_all_runs";
+        }
+        if (document.activeElement !== document.getElementById("settings-likeness")) {
+          document.getElementById("settings-likeness").checked = Boolean(config.judge_likeness_enabled);
+        }
+        if (document.activeElement !== document.getElementById("settings-public-total-scores")) {
+          document.getElementById("settings-public-total-scores").checked = Boolean(config.show_public_total_scores);
+        }
+        if (document.activeElement !== document.getElementById("settings-graphics-total-scores")) {
+          document.getElementById("settings-graphics-total-scores").checked = Boolean(config.show_graphics_total_scores);
+        }
+        if (document.activeElement !== document.getElementById("settings-landing-notice")) {
+          document.getElementById("settings-landing-notice").value = config.landing_notice || "";
+        }
+        if (!document.getElementById("lifecycle-event-name").value) {
+          document.getElementById("lifecycle-event-name").value = event.name || "";
+        }
+        if (!document.getElementById("lifecycle-venue").value) {
+          document.getElementById("lifecycle-venue").value = event.venue || "";
+        }
+        if (!document.getElementById("lifecycle-date").value) {
+          document.getElementById("lifecycle-date").value = event.event_date || "";
+        }
+
+        const hiddenOld = Number(sessions.summary.hidden_old || 0);
+        document.getElementById("session-summary").innerHTML = `
+          <div class="summary-card"><span>Total</span><strong>${sessions.summary.total}</strong></div>
+          <div class="summary-card"><span>Connected</span><strong>${sessions.summary.connected}</strong></div>
+          <div class="summary-card"><span>Idle</span><strong>${sessions.summary.idle}</strong></div>
+          <div class="summary-card"><span>Stale</span><strong>${sessions.summary.stale}</strong></div>
+          <div class="summary-card"><span>Hidden old</span><strong>${hiddenOld}</strong></div>
+        `;
+        const sessionRows = (sessions.sessions || []).map(item => {
+          const statusClass = item.status === "connected" ? "good-pill" : item.status === "idle" ? "warn-pill" : "danger-pill";
+          const accountLine = [
+            roleDisplay(item.role),
+            item.pin_account_id ? `PIN account #${item.pin_account_id}` : null,
+            item.permission_level ? `level ${item.permission_level}` : null,
+            `session #${item.session_id}`,
+          ].filter(Boolean).join(" · ");
+          const deviceTitle = escapeHtml(item.device_id || "no device id");
+          return `
+            <div class="session-row">
+              <div>
+                <strong>${escapeHtml(item.display_name)}${item.judge_name ? ` / ${escapeHtml(item.judge_name)}` : ""}</strong>
+                <span class="muted session-meta-line">${escapeHtml(accountLine)}</span>
+                <span class="muted session-meta-line" title="${deviceTitle}">Device ${escapeHtml(shortIdentifier(item.device_id))} · started ${escapeHtml(formatSessionTime(item.created_at))} · last seen ${escapeHtml(formatSessionTime(item.last_seen_at))}</span>
+              </div>
+              <span class="status-pill ${statusClass}">${escapeHtml(item.status)} · ${formatSessionAge(item.seconds_since_seen)}</span>
+            </div>
+          `;
+        }).join("");
+        document.getElementById("session-list").innerHTML = `
+          ${sessionRows || `<p class="muted">No recent sessions are connected right now.</p>`}
+          ${hiddenOld ? `<p class="muted">Hiding ${hiddenOld} disconnected session${hiddenOld === 1 ? "" : "s"} older than ${Math.round((sessions.summary.hide_after_seconds || 10800) / 3600)} hours.</p>` : ""}
+        `;
+      }
+
+      function formatDelayDetailed(delay) {
+        if (!delay) return "No active delay";
+        if (delay.remaining_seconds === null || delay.remaining_seconds === undefined) return delay.message;
+        const delta = Math.floor((Date.now() - Number(delay.fetched_at_ms || Date.now())) / 1000);
+        return `${delay.message} - ${Kairix.formatSeconds(Math.max(0, Number(delay.remaining_seconds || 0) - delta))}`;
+      }
+
+      function renderAdminDelayReadout() {
+        const text = formatDelayDetailed(adminState.latestDelay);
+        document.getElementById("control-delay-live").textContent = text;
+        document.getElementById("summary-delay").textContent = text;
+      }
+
+      function defaultTheme() {
+        return {
+          bg: "#f7f7f4",
+          panel: "#ffffff",
+          ink: "#181818",
+          muted: "#646464",
+          line: "#d9d9d2",
+          accent: "#b91c1c",
+          good: "#147a43",
+          warn: "#a15c00",
+          dark: "#121212",
+          blue: "#175b89",
+        };
+      }
+
+      function themeFromControls() {
+        const keys = Object.keys(defaultTheme());
+        return Object.fromEntries(keys.map(key => [key, document.getElementById(`theme-${key}`).value]));
+      }
+
+      function hydrateThemeControls(theme = {}) {
+        if (adminState.session.role !== "owner") return;
+        const values = { ...defaultTheme(), ...theme };
+        Object.entries(values).forEach(([key, value]) => {
+          const input = document.getElementById(`theme-${key}`);
+          if (input && document.activeElement !== input) input.value = value;
+        });
+      }
+
+      function formatSeconds(value) {
+        return Kairix.formatSeconds(value);
+      }
+
+      function parseTimerValue(value) {
+        const clean = String(value || "").trim();
+        if (!clean) return 0;
+        if (clean.includes(":")) {
+          const parts = clean.split(":").map(part => Number(part.replace(/\D/g, "") || 0));
+          return (parts[0] || 0) * 60 + (parts[1] || 0);
+        }
+        const digits = clean.replace(/\D/g, "");
+        if (digits.length <= 2) return Number(digits || 0);
+        return Number(digits.slice(0, -2)) * 60 + Number(digits.slice(-2));
+      }
+
+      function updateTimerFromState(timer) {
+        if (!timer) {
+          document.getElementById("timer-live").textContent = "00:00";
+          document.getElementById("timer-status").textContent = "ready";
+          return;
+        }
+        adminState.latestEventState.timer = Kairix.stampTimer(timer);
+        renderTimerReadout();
+        document.getElementById("timer-mode").value = timer.mode || "count_up";
+        if (document.activeElement !== document.getElementById("timer-value")) {
+          const seconds = timer.mode === "count_down" ? timer.target_seconds : timer.display_seconds;
+          document.getElementById("timer-value").value = formatSeconds(seconds);
+        }
+        if (document.activeElement !== document.getElementById("timer-max")) {
+          document.getElementById("timer-max").value = formatSeconds(timer.target_seconds || 90);
+        }
+      }
+
+      function renderTimerReadout() {
+        const timer = adminState.latestEventState?.timer;
+        if (!timer) {
+          document.getElementById("timer-live").textContent = "00:00";
+          document.getElementById("summary-timer").textContent = "00:00";
+          return;
+        }
+        const display = Kairix.timerDisplaySeconds(timer);
+        const text = formatSeconds(display);
+        document.getElementById("timer-live").textContent = text;
+        document.getElementById("timer-status").textContent = timer.status;
+        document.getElementById("summary-timer").textContent = `${text} / ${timer.status}`;
+      }
+
+      async function sendTimer(action, elapsedOverride = null) {
+        const mode = document.getElementById("timer-mode").value;
+        const seconds = parseTimerValue(document.getElementById("timer-value").value);
+        const maxSeconds = parseTimerValue(document.getElementById("timer-max").value) || 90;
+        const payload = {
+          session_id: adminState.session.session_id,
+          run_id: adminState.currentRun?.id || null,
+          mode,
+          target_seconds: mode === "count_down" ? seconds : maxSeconds,
+          elapsed_seconds: elapsedOverride,
+          action,
+        };
+        if (mode === "count_up" && ["adjust", "set", "start"].includes(action)) {
+          payload.elapsed_seconds = elapsedOverride ?? seconds;
+        }
+        if (mode === "count_down" && action === "start") {
+          payload.elapsed_seconds = 0;
+        }
+        await Kairix.API.post("/api/admin/timer", payload);
+        refresh();
+      }
+
+      async function refreshCompetitors(force = false) {
+        const editingActive = document.activeElement?.closest?.("#competitor-order .run-edit");
+        const orderingActive = Date.now() < adminState.orderEditingUntil || adminState.orderDirty;
+        if (!force && (editingActive || adminState.editingRuns.size || orderingActive)) return;
+        const data = await Kairix.API.get(`/api/admin/runs?session_id=${adminState.session.session_id}`);
+        const currentId = adminState.latestEventState?.current_run?.id;
+        const upNextId = adminState.latestEventState?.actual_up_next_run?.id;
+        document.getElementById("competitor-order").innerHTML = data.runs.map(run => {
+          const isCurrent = currentId === run.id;
+          const isUpNext = upNextId === run.id;
+          return `
+          <div class="card run-order-row ${isCurrent ? "current-run-highlight" : ""} ${isUpNext ? "featured-run-highlight" : ""}" draggable="true" data-run-id="${run.id}">
+            <input class="order-input" type="number" min="1" value="${run.queue_position}" data-run-id="${run.id}">
+            <div>
+              <strong>#${run.competitor.entry_number} ${run.competitor.driver_name}</strong>
+              <div class="muted">${run.vehicle.name || "Vehicle TBC"} ${run.vehicle.engine || ""} / ${run.run_type} / ${run.state || "not assigned"}</div>
+              <div class="mini-badges">
+                ${isCurrent ? '<em>CURRENT</em>' : ""}
+                ${isUpNext ? '<em>UP NEXT</em>' : ""}
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn ${isCurrent ? "active-state" : ""}" data-current="${run.id}" data-help="Make this run the official current competitor for judges, queue displays, and event control.">Set Current</button>
+              <button class="btn" data-edit-run="${run.id}" data-help="Open or close inline editing for this competitor, vehicle, run type, state, heat, and order.">Edit</button>
+            </div>
+            <div class="run-edit" id="edit-run-${run.id}" style="display:${adminState.editingRuns.has(String(run.id)) ? "block" : "none"}; grid-column: 1 / -1;">
+              <div class="grid tight">
+                <label>Entry # <input data-run-field="entry_number" value="${escapeHtml(run.competitor.entry_number || "")}"></label>
+                <label>Driver <input data-run-field="driver_name" value="${escapeHtml(run.competitor.driver_name || "")}"></label>
+                <label>Class <input data-run-field="class_name" value="${escapeHtml(run.competitor.class_name || "")}"></label>
+                <label>Car <input data-run-field="car_name" value="${escapeHtml(run.vehicle.name || "")}"></label>
+                <label>Engine <input data-run-field="engine" value="${escapeHtml(run.vehicle.engine || "")}"></label>
+                <label>Plate <input data-run-field="plate" value="${escapeHtml(run.vehicle.plate || "")}"></label>
+                <label>Queue <input data-run-field="queue_position" type="number" value="${run.queue_position}"></label>
+                <label>Heat <input data-run-field="heat_number" type="number" min="1" value="${run.heat_number || 1}"></label>
+                <label>Run Type
+                  <select data-run-field="run_type">
+                    ${["competition", "demo", "fun", "exhibition", "test"].map(type => `<option value="${type}" ${run.run_type === type ? "selected" : ""}>${type}</option>`).join("")}
+                  </select>
+                </label>
+                <label>State
+                  <select data-run-field="run_state">
+                    ${["", "queued", "staging", "on_pad", "finished", "skipped", "delayed", "withdrawn", "mechanical_issue", "disqualified"].map(type => `<option value="${type}" ${(run.state || "") === type ? "selected" : ""}>${type || "not assigned"}</option>`).join("")}
+                  </select>
+                </label>
+              </div>
+              <button class="btn primary" data-save-run="${run.id}" style="margin-top:8px;" data-help="Save edited competitor, vehicle, run, heat, and queue details for this row.">Save Details</button>
+            </div>
+          </div>
+        `;
+        }).join("");
+      }
+
+      async function refreshCriteria() {
+        const data = await Kairix.API.get(`/api/admin/criteria?session_id=${adminState.session.session_id}`);
+        document.getElementById("criteria-list").innerHTML = data.criteria.map(item => `
+          <div class="card" data-criterion-row="${item.id}">
+            <div class="grid tight">
+              <label>Name <input data-crit-field="name" value="${item.name}"></label>
+              <label>Short <input data-crit-field="short_label" value="${item.short_label || ""}"></label>
+              <label>Type
+                <select data-crit-field="type">${criterionTypeOptions(item.type)}</select>
+              </label>
+              <label>Min <input data-crit-field="min_value" type="number" value="${item.min_value ?? ""}"></label>
+              <label>Max <input data-crit-field="max_value" type="number" value="${item.max_value ?? ""}"></label>
+              <label>Step <input data-crit-field="step_size" type="number" value="${item.step_size}"></label>
+              <label>Points <input data-crit-field="points_per_unit" type="number" value="${item.points_per_unit}"></label>
+              <label>Order <input data-crit-field="display_order" type="number" value="${item.display_order}"></label>
+            </div>
+            <div class="btn-row" style="margin-top:8px;">
+              <label><input data-crit-field="required" type="checkbox" ${item.required ? "checked" : ""}> Required</label>
+              <label><input data-crit-field="allows_negative" type="checkbox" ${item.allows_negative ? "checked" : ""}> Negative</label>
+              <label><input data-crit-field="visible_to_judges" type="checkbox" ${item.visible_to_judges ? "checked" : ""}> Judges</label>
+              <label><input data-crit-field="visible_to_graphics" type="checkbox" ${item.visible_to_graphics ? "checked" : ""}> Graphics</label>
+              <button class="btn primary" data-save-criterion="${item.id}" data-help="Save edits to this criterion. Existing score records are preserved.">Save</button>
+              <button class="btn" data-toggle-criterion="${item.id}" data-help="Enable or disable this criterion without deleting historic score records.">${item.active ? "Disable" : "Enable"}</button>
+                ${adminState.session.role === "owner" ? `<button class="btn danger" data-delete-criterion="${item.id}" data-help="Owner only: delete this criterion from active configuration. Existing score records remain preserved.">Delete Criterion</button>` : ""}
+            </div>
+          </div>
+        `).join("");
+      }
+
+      function collectAdjustmentItems(panel) {
+        const items = [];
+        for (const input of panel.querySelectorAll("[data-adjustment-criterion]")) {
+          const criterionId = Number(input.dataset.adjustmentCriterion);
+          const blank = panel.querySelector(`[data-adjustment-blank="${criterionId}"]`)?.checked;
+          const clean = String(input.value || "").trim();
+          const value = blank || clean === "" ? null : Number(clean);
+          if (clean !== "" && !blank && !Number.isFinite(value)) {
+            alert("One of the score values is not a number. Adjustment cancelled.");
+            return null;
+          }
+          items.push({
+            criterion_id: criterionId,
+            value,
+            intentionally_blank: value === null,
+          });
+        }
+        return items;
+      }
+
+      async function createScoreOverride(entryId, button, options = {}) {
+        const panel = button?.closest?.("[data-adjustment-panel]");
+        const status = panel?.querySelector("[data-adjustment-status]");
+        if (!canAdjustScores()) {
+          alert("Only high admin or owner can adjust scoring.");
+          return false;
+        }
+        const entry = adminState.scoreEntryCache.get(String(entryId));
+        if (!entry) {
+          alert("Could not find that score entry in the current view. Refresh and try again.");
+          return false;
+        }
+        const reason = String(options.reason || "").trim();
+        if (!reason) {
+          alert("Add an audit note before saving the scoring adjustment.");
+          return false;
+        }
+        const items = options.items || [];
+        if (!items) return false;
+        if (!items.length) {
+          alert("No score fields were available to adjust.");
+          return false;
+        }
+        if (status) {
+          status.textContent = "Saving adjustment...";
+          status.className = "adjustment-save-status saving";
+        }
+        button?.classList.add("save-press");
+        await Kairix.withButtonFeedback(button, () => Kairix.API.post("/api/admin/score-overrides", {
+          session_id: adminState.session.session_id,
+          original_score_entry_id: Number(entryId),
+          reason,
+          items,
+        }));
+        if (status) {
+          status.textContent = "Saved. Original score stays in audit; adjusted score is official.";
+          status.className = "adjustment-save-status saved";
+        }
+        button?.classList.add("save-burst");
+        setTimeout(() => button?.classList.remove("save-press", "save-burst"), 900);
+        if (!options.skipRefresh) refresh({ forceAdjustmentRefresh: true });
+        return true;
+      }
+
+      document.body.addEventListener("click", async event => {
+        const judgeAlertsToggle = event.target.closest("#toggle-judge-alerts");
+        if (judgeAlertsToggle) {
+          adminState.judgeAlertsCollapsed = !adminState.judgeAlertsCollapsed;
+          updateJudgeAlertCollapse();
+          return;
+        }
+        const adjustmentToggle = event.target.closest("[data-toggle-adjustment]");
+        if (adjustmentToggle) {
+          const key = adjustmentToggle.dataset.toggleAdjustment;
+          const panel = findAdjustmentPanel(adjustmentToggle, key);
+          const opening = !panel?.classList.contains("open");
+          if (opening) {
+            adminState.openAdjustments.add(key);
+          } else {
+            adminState.openAdjustments.delete(key);
+          }
+          panel?.classList.toggle("open", opening);
+          return;
+        }
+        const adjustmentCancel = event.target.closest("[data-cancel-adjustment]");
+        if (adjustmentCancel) {
+          const key = adjustmentCancel.dataset.cancelAdjustment;
+          adminState.openAdjustments.delete(key);
+          adminState.adjustmentDrafts.delete(key);
+          findAdjustmentPanel(adjustmentCancel, key)?.classList.remove("open");
+          return;
+        }
+        const adjustmentSubmit = event.target.closest("[data-submit-adjustment]");
+        if (adjustmentSubmit) {
+          const key = adjustmentSubmit.dataset.submitAdjustment;
+          const panel = findAdjustmentPanel(adjustmentSubmit, key);
+          if (!panel) return;
+          const items = collectAdjustmentItems(panel);
+          if (!items) return;
+          const reason = panel.querySelector("[data-adjustment-reason]")?.value || "";
+          const changeRequestId = adjustmentSubmit.dataset.changeRequestId;
+          const created = await createScoreOverride(adjustmentSubmit.dataset.entryId, adjustmentSubmit, {
+            items,
+            reason,
+            skipRefresh: true,
+          });
+          if (created) {
+            adminState.openAdjustments.delete(key);
+            adminState.adjustmentDrafts.delete(key);
+          }
+          if (created && changeRequestId) {
+            await Kairix.API.post(`/api/admin/score-change-requests/${changeRequestId}/status`, {
+              session_id: adminState.session.session_id,
+              status: "resolved_manually",
+              note: "Scoring adjustment saved from request",
+            });
+          }
+          if (created) refresh({ forceAdjustmentRefresh: true });
+          return;
+        }
+        const current = event.target.closest("[data-current]");
+        if (current) {
+          await fetch(`/api/admin/current-run/${current.dataset.current}?session_id=${adminState.session.session_id}`, { method: "POST" });
+          refresh();
+        }
+        const stateButton = event.target.closest("[data-state]");
+        if (stateButton && adminState.currentRun) {
+          const autoStart = document.getElementById("auto-start-on-pad")?.checked !== false;
+          const startTimer = stateButton.dataset.state === "on_pad" ? autoStart : true;
+          const res = await fetch(`/api/admin/run/${adminState.currentRun.id}/state/${stateButton.dataset.state}?session_id=${adminState.session.session_id}&start_timer=${startTimer}`, { method: "POST" });
+          const result = await res.json().catch(() => ({}));
+          if (stateButton.dataset.state === "finished" && result.advanced_to_run_id) {
+            document.getElementById("current").innerHTML = "<strong>Advanced to next competitor.</strong>";
+          }
+          refresh();
+        }
+        const runTypeButton = event.target.closest("[data-current-run-type]");
+        if (runTypeButton && adminState.currentRun) {
+          await Kairix.withButtonFeedback(runTypeButton, () => fetch(`/api/admin/run/${adminState.currentRun.id}/type/${runTypeButton.dataset.currentRunType}?session_id=${adminState.session.session_id}`, { method: "POST" }));
+          refresh();
+        }
+        const stateAction = event.target.closest("[data-state-action]");
+        if (stateAction) {
+          const action = stateAction.dataset.stateAction;
+          if (action === "clear-current") {
+            if (!confirm("Clear the official current run? Judges will not have a current competitor until one is set.")) return;
+            await Kairix.withButtonFeedback(stateAction, () => fetch(`/api/admin/current-state/clear-current-run?session_id=${adminState.session.session_id}`, { method: "POST" }));
+          }
+          refresh();
+        }
+        const timerAction = event.target.closest("[data-timer-action]");
+        if (timerAction) {
+          await Kairix.withButtonFeedback(timerAction, () => sendTimer(timerAction.dataset.timerAction));
+        }
+        const timerStep = event.target.closest("[data-timer-step]");
+        if (timerStep) {
+          const current = parseTimerValue(document.getElementById("timer-value").value);
+          const next = Math.max(0, current + Number(timerStep.dataset.timerStep));
+          document.getElementById("timer-value").value = formatSeconds(next);
+          const action = document.getElementById("timer-mode").value === "count_down" ? "set" : "adjust";
+          await Kairix.withButtonFeedback(timerStep, () => sendTimer(action, action === "adjust" ? next : null));
+        }
+        const editRun = event.target.closest("[data-edit-run]");
+        if (editRun) {
+          const runId = editRun.dataset.editRun;
+          const panel = document.getElementById(`edit-run-${editRun.dataset.editRun}`);
+          const opening = panel.style.display === "none";
+          panel.style.display = opening ? "block" : "none";
+          if (opening) {
+            adminState.editingRuns.add(runId);
+          } else {
+            adminState.editingRuns.delete(runId);
+          }
+        }
+        const saveRun = event.target.closest("[data-save-run]");
+        if (saveRun) {
+          const panel = document.getElementById(`edit-run-${saveRun.dataset.saveRun}`);
+          await Kairix.withButtonFeedback(saveRun, () => Kairix.API.put(`/api/admin/runs/${saveRun.dataset.saveRun}`, collectRunDetails(panel)));
+          adminState.editingRuns.delete(saveRun.dataset.saveRun);
+          await refreshCompetitors(true);
+          refresh();
+        }
+        const toggleCriterion = event.target.closest("[data-toggle-criterion]");
+        if (toggleCriterion) {
+          await fetch(`/api/admin/criteria/${toggleCriterion.dataset.toggleCriterion}/toggle?session_id=${adminState.session.session_id}`, { method: "POST" });
+          refreshCriteria();
+        }
+        const saveCriterion = event.target.closest("[data-save-criterion]");
+        if (saveCriterion) {
+          const row = saveCriterion.closest("[data-criterion-row]");
+          await Kairix.withButtonFeedback(saveCriterion, () => Kairix.API.put(`/api/admin/criteria/${saveCriterion.dataset.saveCriterion}`, collectCriterion(row)));
+          refreshCriteria();
+        }
+        const deleteCriterion = event.target.closest("[data-delete-criterion]");
+        if (deleteCriterion) {
+          if (!confirm("Delete this criterion? Existing score records are preserved, but the criterion will be removed from active use.")) return;
+          await Kairix.withButtonFeedback(deleteCriterion, () => fetch(`/api/admin/criteria/${deleteCriterion.dataset.deleteCriterion}?session_id=${adminState.session.session_id}`, { method: "DELETE" }));
+          refreshCriteria();
+        }
+        const savePin = event.target.closest("[data-save-pin]");
+        if (savePin) {
+          const row = savePin.closest("[data-pin-row]");
+          await Kairix.withButtonFeedback(savePin, () => Kairix.API.put(`/api/admin/pin-accounts/${savePin.dataset.savePin}`, collectPin(row)));
+          refresh();
+        }
+        const deletePin = event.target.closest("[data-delete-pin]");
+        if (deletePin) {
+          if (!confirm("Delete this PIN account? It will be disabled, not physically removed, so audit records still make sense.")) return;
+          await Kairix.withButtonFeedback(deletePin, () => fetch(`/api/admin/pin-accounts/${deletePin.dataset.deletePin}?session_id=${adminState.session.session_id}`, { method: "DELETE" }));
+          refresh();
+        }
+        const issueStatus = event.target.closest("[data-issue-status]");
+        if (issueStatus) {
+          const [id, status] = issueStatus.dataset.issueStatus.split(":");
+          await Kairix.withButtonFeedback(issueStatus, () => Kairix.API.post(`/api/admin/judge-issue-reports/${id}/status`, {
+            session_id: adminState.session.session_id,
+            status,
+          }));
+          refresh();
+        }
+        const issueDelay = event.target.closest("[data-issue-delay]");
+        if (issueDelay) {
+          const report = adminState.issueAlertCache.get(String(issueDelay.dataset.issueDelay));
+          if (!report) return;
+          const minutes = Number(prompt("Approx delay minutes", "5") || 0);
+          await Kairix.withButtonFeedback(issueDelay, async () => {
+            await Kairix.API.post("/api/admin/delay", {
+              session_id: adminState.session.session_id,
+              message: `${report.issue_type}: ${report.note || report.competitor || "judge report"}`,
+              estimated_minutes: Number.isFinite(minutes) ? minutes : 0,
+              source: "judge_report",
+              official: true,
+              priority: report.issue_type === "safety" ? "critical" : "high",
+              visibility: "judges,obs,queue",
+            });
+            await Kairix.API.post(`/api/admin/judge-issue-reports/${report.id}/status`, {
+              session_id: adminState.session.session_id,
+              status: "actioned",
+              note: "Converted to official delay",
+            });
+          });
+          refresh();
+        }
+        const changeStatus = event.target.closest("[data-change-status]");
+        if (changeStatus) {
+          const [id, status] = changeStatus.dataset.changeStatus.split(":");
+          const note = status === "rejected" ? prompt("Optional rejection note", "") : null;
+          await Kairix.withButtonFeedback(changeStatus, () => Kairix.API.post(`/api/admin/score-change-requests/${id}/status`, {
+            session_id: adminState.session.session_id,
+            status,
+            note,
+          }));
+          refresh();
+        }
+        const resultView = event.target.closest("[data-result-view]");
+        if (resultView) {
+          adminState.resultView = resultView.dataset.resultView;
+          refresh();
+        }
+        const armNextHeat = event.target.closest("#arm-next-heat");
+        if (armNextHeat) {
+          const currentHeat = Number(adminState.latestEventState?.current_heat || 1);
+          adminState.pendingHeat = currentHeat + 1;
+          adminState.heatArmedUntil = Date.now() + 8000;
+          renderRunHeatControl(adminState.latestEventState);
+        }
+        const confirmNextHeat = event.target.closest("#confirm-next-heat");
+        if (confirmNextHeat) {
+          const pendingHeat = adminState.pendingHeat;
+          if (!pendingHeat || Date.now() >= adminState.heatArmedUntil) {
+            adminState.pendingHeat = null;
+            renderRunHeatControl(adminState.latestEventState);
+            return;
+          }
+          await Kairix.withButtonFeedback(confirmNextHeat, () => fetch(`/api/admin/current-heat/${pendingHeat}?session_id=${adminState.session.session_id}`, { method: "POST" }));
+          adminState.selectedHeat = pendingHeat;
+          adminState.pendingHeat = null;
+          adminState.heatArmedUntil = 0;
+          refresh();
+        }
+        const selectHeat = event.target.closest("[data-select-heat]");
+        if (selectHeat) {
+          adminState.selectedHeat = Number(selectHeat.dataset.selectHeat);
+          refresh();
+        }
+        const setCurrentHeat = event.target.closest("[data-set-current-heat]");
+        if (setCurrentHeat) {
+          if (!confirm(`Make Heat ${adminState.selectedHeat || 1} the active event heat?`)) return;
+          await Kairix.withButtonFeedback(setCurrentHeat, () => fetch(`/api/admin/current-heat/${adminState.selectedHeat || 1}?session_id=${adminState.session.session_id}`, { method: "POST" }));
+          refresh();
+        }
+      });
+
+      document.body.addEventListener("input", event => {
+        const scoreInput = event.target.closest("[data-adjustment-criterion]");
+        if (scoreInput) {
+          const panel = scoreInput.closest("[data-adjustment-panel]");
+          const blank = panel?.querySelector(`[data-adjustment-blank="${scoreInput.dataset.adjustmentCriterion}"]`);
+          if (blank && String(scoreInput.value || "").trim() !== "") blank.checked = false;
+          rememberAdjustmentDraft(panel);
+          return;
+        }
+        const reasonInput = event.target.closest("[data-adjustment-reason]");
+        if (reasonInput) rememberAdjustmentDraft(reasonInput.closest("[data-adjustment-panel]"));
+      });
+
+      document.body.addEventListener("change", event => {
+        const blankInput = event.target.closest("[data-adjustment-blank]");
+        if (!blankInput) return;
+        const panel = blankInput.closest("[data-adjustment-panel]");
+        const scoreInput = panel?.querySelector(`[data-adjustment-criterion="${blankInput.dataset.adjustmentBlank}"]`);
+        if (blankInput.checked && scoreInput) scoreInput.value = "";
+        rememberAdjustmentDraft(panel);
+      });
+
+      function collectPin(row) {
+        const valueOf = field => row.querySelector(`[data-pin-field="${field}"]`);
+        return {
+          session_id: adminState.session.session_id,
+          display_name: valueOf("display_name").value,
+          pin: valueOf("pin").value,
+          role: valueOf("role").value,
+          permission_level: Number(valueOf("permission_level").value),
+          active: valueOf("active").checked,
+        };
+      }
+
+      function collectCriterion(row) {
+        const valueOf = field => row.querySelector(`[data-crit-field="${field}"]`);
+        return {
+          session_id: adminState.session.session_id,
+          name: valueOf("name").value,
+          short_label: valueOf("short_label").value || null,
+          type: valueOf("type").value,
+          min_value: Number(valueOf("min_value").value || 0),
+          max_value: Number(valueOf("max_value").value || 0),
+          step_size: Number(valueOf("step_size").value || 1),
+          points_per_unit: Number(valueOf("points_per_unit").value || 1),
+          allows_negative: valueOf("allows_negative").checked,
+          required: valueOf("required").checked,
+          visible_to_judges: valueOf("visible_to_judges").checked,
+          visible_to_graphics: valueOf("visible_to_graphics").checked,
+          display_order: Number(valueOf("display_order").value || 100),
+        };
+      }
+
+      function collectRunDetails(panel) {
+        const valueOf = field => panel.querySelector(`[data-run-field="${field}"]`);
+        return {
+          session_id: adminState.session.session_id,
+          entry_number: valueOf("entry_number").value,
+          driver_name: valueOf("driver_name").value,
+          class_name: valueOf("class_name").value || null,
+          car_name: valueOf("car_name").value || "Vehicle TBC",
+          engine: valueOf("engine").value || null,
+          plate: valueOf("plate").value || null,
+          run_type: valueOf("run_type").value,
+          run_state: valueOf("run_state").value || null,
+          queue_position: Number(valueOf("queue_position").value || 0),
+          heat_number: Number(valueOf("heat_number")?.value || 1),
+        };
+      }
+
+      let draggedRunId = null;
+      function markOrderDirty() {
+        adminState.orderDirty = true;
+        adminState.orderEditingUntil = Date.now() + 45000;
+        const saveButton = document.getElementById("save-order");
+        saveButton.classList.add("attention");
+        saveButton.textContent = "Save Order";
+      }
+
+      document.getElementById("competitor-order").addEventListener("dragstart", event => {
+        const row = event.target.closest(".run-order-row");
+        if (!row) return;
+        draggedRunId = row.dataset.runId;
+        adminState.orderEditingUntil = Date.now() + 45000;
+        row.classList.add("dragging");
+      });
+      document.getElementById("competitor-order").addEventListener("dragend", event => {
+        event.target.closest(".run-order-row")?.classList.remove("dragging");
+        markOrderDirty();
+      });
+      document.getElementById("competitor-order").addEventListener("dragover", event => {
+        event.preventDefault();
+        const row = event.target.closest(".run-order-row");
+        const dragged = document.querySelector(`.run-order-row[data-run-id="${draggedRunId}"]`);
+        if (!row || !dragged || row === dragged) return;
+        const rect = row.getBoundingClientRect();
+        const after = event.clientY > rect.top + rect.height / 2;
+        row.parentElement.insertBefore(dragged, after ? row.nextSibling : row);
+        renumberInputs();
+        markOrderDirty();
+      });
+      document.getElementById("competitor-order").addEventListener("input", event => {
+        if (event.target.closest(".order-input")) markOrderDirty();
+      });
+
+      function renumberInputs() {
+        [...document.querySelectorAll("#competitor-order .order-input")].forEach((input, idx) => input.value = idx + 1);
+        markOrderDirty();
+      }
+
+      async function saveOrder(button) {
+        const items = [...document.querySelectorAll("#competitor-order .order-input")].map(input => ({
+          run_id: Number(input.dataset.runId),
+          queue_position: Number(input.value),
+        }));
+        await Kairix.withButtonFeedback(button, () => Kairix.API.post("/api/admin/run-order", {
+          session_id: adminState.session.session_id,
+          items,
+        }));
+        adminState.orderDirty = false;
+        adminState.orderEditingUntil = 0;
+        button.classList.remove("attention");
+        refresh();
+      }
+
+      document.getElementById("renumber-order").addEventListener("click", event => {
+        renumberInputs();
+        event.currentTarget.classList.add("pressed");
+        setTimeout(() => event.currentTarget.classList.remove("pressed"), 180);
+      });
+      document.getElementById("save-order").addEventListener("click", event => saveOrder(event.currentTarget));
+      document.getElementById("timer-value").addEventListener("blur", event => {
+        event.target.value = formatSeconds(parseTimerValue(event.target.value));
+        sendTimer("set");
+      });
+      document.getElementById("timer-max").addEventListener("blur", event => {
+        event.target.value = formatSeconds(parseTimerValue(event.target.value));
+        sendTimer("set");
+      });
+      document.getElementById("timer-mode").addEventListener("change", () => sendTimer("set"));
+
+      async function setOfficialDelay(message, minutes) {
+        if (!message) {
+          alert("Enter a delay message first.");
+          return;
+        }
+        await Kairix.API.post("/api/admin/delay", {
+          session_id: adminState.session.session_id,
+          message,
+          estimated_minutes: Number(minutes || 0),
+          estimated_seconds: Number(minutes || 0) * 60,
+          source: "admin",
+          official: true,
+          priority: "high",
+          visibility: "judges,obs,queue",
+        });
+        refresh();
+      }
+
+      document.body.addEventListener("click", async event => {
+        const controlDelay = event.target.closest("[data-control-delay]");
+        if (controlDelay) {
+          const message = prompt("Delay message", "Track cleanup");
+          if (!message) return;
+          const minutes = document.getElementById("control-delay-minutes").value || prompt("Approx minutes", "5");
+          await Kairix.withButtonFeedback(controlDelay, () => setOfficialDelay(message.trim(), minutes));
+        }
+
+        const quickDelay = event.target.closest("[data-quick-delay]");
+        if (quickDelay) {
+          document.getElementById("control-delay-minutes").value = quickDelay.dataset.minutes || "";
+          await Kairix.withButtonFeedback(quickDelay, () => setOfficialDelay(
+            quickDelay.dataset.quickDelay,
+            document.getElementById("control-delay-minutes").value || quickDelay.dataset.minutes
+          ));
+        }
+
+        const clearControlDelay = event.target.closest("[data-control-delay-clear]");
+        if (clearControlDelay) {
+          await Kairix.withButtonFeedback(clearControlDelay, () => fetch(`/api/admin/delay/clear?session_id=${adminState.session.session_id}`, { method: "POST" }));
+          refresh();
+        }
+      });
+
+      document.getElementById("add-pin").addEventListener("click", async () => {
+        await Kairix.API.post("/api/admin/pin-accounts", {
+          session_id: adminState.session.session_id,
+          display_name: document.getElementById("pin-name").value,
+          pin: document.getElementById("pin-value").value,
+          role: document.getElementById("pin-role").value,
+          permission_level: Number(document.getElementById("pin-level").value),
+          active: true,
+        });
+        document.getElementById("pin-name").value = "";
+        document.getElementById("pin-value").value = "";
+        refresh();
+      });
+
+      document.getElementById("add-criterion").addEventListener("click", async () => {
+        await Kairix.API.post("/api/admin/criteria", {
+          session_id: adminState.session.session_id,
+          name: document.getElementById("crit-name").value,
+          short_label: document.getElementById("crit-short").value || null,
+          type: document.getElementById("crit-type").value,
+          min_value: Number(document.getElementById("crit-min").value),
+          max_value: Number(document.getElementById("crit-max").value),
+          step_size: Number(document.getElementById("crit-step").value || 1),
+          points_per_unit: Number(document.getElementById("crit-points").value || 1),
+          allows_negative: document.getElementById("crit-negative").checked,
+          required: document.getElementById("crit-required").checked,
+          visible_to_judges: document.getElementById("crit-judges").checked,
+          visible_to_graphics: document.getElementById("crit-gfx").checked,
+          display_order: Number(document.getElementById("crit-order").value || 100),
+        });
+        document.getElementById("crit-name").value = "";
+        document.getElementById("crit-short").value = "";
+        refreshCriteria();
+      });
+
+      document.getElementById("save-settings").addEventListener("click", async event => {
+        await Kairix.withButtonFeedback(event.currentTarget, () => Kairix.API.put("/api/admin/settings", {
+          session_id: adminState.session.session_id,
+          event_name: document.getElementById("settings-event-name").value,
+          venue: document.getElementById("settings-venue").value || null,
+          event_date: document.getElementById("settings-date").value || null,
+          result_mode: document.getElementById("settings-result-mode").value,
+          public_delay_seconds: Number(document.getElementById("settings-public-delay").value || 0),
+          show_public_total_scores: document.getElementById("settings-public-total-scores").checked,
+          show_graphics_total_scores: document.getElementById("settings-graphics-total-scores").checked,
+          judge_likeness_enabled: document.getElementById("settings-likeness").checked,
+          landing_notice: document.getElementById("settings-landing-notice").value || null,
+        }));
+        setSettingsStatus("Settings saved.");
+        await refresh();
+      });
+
+      document.getElementById("refresh-settings").addEventListener("click", async event => {
+        await Kairix.withButtonFeedback(event.currentTarget, refreshSettingsPanel);
+        setSettingsStatus("Settings refreshed.");
+      });
+
+      document.getElementById("archive-event").addEventListener("click", async event => {
+        if (!confirm("Archive the current event and create a new active event? Everyone will need to log in again.")) return;
+        if (!confirm("Final warning. This will close the current event and start a fresh one.")) return;
+        const payload = {
+          session_id: adminState.session.session_id,
+          event_name: document.getElementById("lifecycle-event-name").value || null,
+          venue: document.getElementById("lifecycle-venue").value || null,
+          event_date: document.getElementById("lifecycle-date").value || null,
+          copy_criteria: document.getElementById("lifecycle-copy-criteria").checked,
+          copy_pin_accounts: document.getElementById("lifecycle-copy-pins").checked,
+          copy_graphics_layout: document.getElementById("lifecycle-copy-graphics").checked,
+          copy_notice: document.getElementById("lifecycle-copy-notice").checked,
+        };
+        const result = await Kairix.withButtonFeedback(event.currentTarget, () => Kairix.API.post("/api/admin/events/archive-and-create", payload));
+        document.getElementById("lifecycle-result").textContent = result.message || "New event created.";
+        Kairix.clearSession();
+        alert(result.message || "New event created. Please log in again.");
+        window.location.href = "/";
+      });
+
+      document.getElementById("import-upload").addEventListener("click", async (event) => {
+        const file = document.getElementById("import-file").files[0];
+        if (!file) {
+          document.getElementById("import-result").innerHTML = `<p class="notice">Choose a CSV or Excel file first.</p>`;
+          return;
+        }
+        const form = new FormData();
+        form.append("file", file);
+        document.getElementById("import-preview").innerHTML = "";
+        document.getElementById("import-submit-bar").style.display = "none";
+        document.getElementById("import-result").innerHTML = `<p class="notice">Reading ${escapeHtml(file.name)}...</p>`;
+        try {
+          const res = await Kairix.withButtonFeedback(event.currentTarget, () => fetch(`/api/admin/competitor-import/preview?session_id=${adminState.session.session_id}`, { method: "POST", body: form }));
+          const text = await res.text();
+          if (!res.ok) {
+            const error = new Error(text);
+            error.status = res.status;
+            throw error;
+          }
+          const data = JSON.parse(text);
+          document.getElementById("import-result").innerHTML = `
+            <div class="import-summary">
+              <span class="status-pill">Rows: ${data.rows.length}</span>
+              <span class="status-pill good-pill">New: ${data.new || 0}</span>
+              <span class="status-pill warn-pill">Updates: ${data.updates || 0}</span>
+              <span class="status-pill">Unchanged: ${data.unchanged || 0}</span>
+              <span class="status-pill danger-pill">Critical Review: ${data.needs_review || 0}</span>
+              <span class="status-pill warn-pill">Warnings: ${data.warnings || 0}</span>
+              <span class="status-pill">Skipped: ${data.skipped_by_default || 0}</span>
+            </div>
+          `;
+          renderImportPreview(data.rows);
+        } catch (error) {
+          if (handleSessionError(error)) return;
+          document.getElementById("import-result").innerHTML = `<p class="danger-zone card"><strong>Import preview failed.</strong><br>${escapeHtml(error.message || error)}</p>`;
+        }
+      });
+
+      function renderImportPreview(rows) {
+        document.getElementById("import-submit-bar").style.display = "flex";
+        document.getElementById("import-preview").innerHTML = rows.map((row, idx) => `
+          <div class="card import-row import-${row.needs_review ? "review" : row.has_warnings ? "warning" : row.import_action || "new"} ${row.needs_review ? "danger-zone" : row.has_warnings ? "warning-zone" : ""}" data-import-row="${idx}">
+            <div class="btn-row" style="justify-content:space-between;">
+              <div>
+                <strong>File row ${row.import_row}: ${escapeHtml(row.entry_number ? "#" + row.entry_number : "No entry #")} ${escapeHtml(row.driver_name || "No driver")}</strong>
+                <div class="muted">${importBadge(row)}${row.has_warnings && !row.needs_review ? ` <span class="status-pill warn-pill">Warning</span>` : ""}${row.existing ? ` Existing record found` : ""}</div>
+              </div>
+              <label><input data-import-field="skip" type="checkbox" ${row.skip ? "checked" : ""}> Skip</label>
+            </div>
+            ${row.differences?.length ? `<div class="notice import-diff">${row.differences.map(diff => `<div><strong>${escapeHtml(diff.label)}:</strong> ${escapeHtml(diff.from || "blank")} -> ${escapeHtml(diff.to || "blank")}</div>`).join("")}</div>` : ""}
+            <div class="grid tight">
+              <label>Entry # <input data-import-field="entry_number" value="${escapeHtml(row.entry_number || "")}"></label>
+              <label>Driver <input data-import-field="driver_name" value="${escapeHtml(row.driver_name || "")}"></label>
+              <label>Class <input data-import-field="class_name" value="${escapeHtml(row.class_name || "")}"></label>
+              <label>Car Name <input data-import-field="car_name" value="${escapeHtml(row.car_name || "")}"></label>
+              <label>Vehicle <input data-import-field="vehicle" value="${escapeHtml(row.vehicle || "")}"></label>
+              <label>Engine <input data-import-field="engine" value="${escapeHtml(row.engine || "")}"></label>
+              <label>Plate <input data-import-field="plate" value="${escapeHtml(row.plate || "")}"></label>
+              <label>Sponsor <input data-import-field="sponsor" value="${escapeHtml(row.sponsor || "")}"></label>
+              <label>Run Type
+                <select data-import-field="run_type">
+                  ${["competition", "demo", "fun", "exhibition", "test"].map(type => `<option value="${type}" ${row.run_type === type ? "selected" : ""}>${type}</option>`).join("")}
+                </select>
+              </label>
+            </div>
+            <label style="margin-top:8px;">Issues / notes <textarea data-import-field="notes">${escapeHtml(row.notes || "")}</textarea></label>
+            ${row.raw_source ? `<p class="muted">Raw: ${escapeHtml(row.raw_source)}</p>` : ""}
+            <input type="hidden" data-import-field="import_row" value="${row.import_row}">
+          </div>
+        `).join("");
+        document.querySelectorAll("[data-import-field='skip']").forEach(input => {
+          input.addEventListener("change", updateImportSubmitSummary);
+        });
+        updateImportSubmitSummary();
+      }
+
+      function importBadge(row) {
+        const label = {
+          new: "New competitor/run",
+          update: "Update existing record",
+          unchanged: "Unchanged, skipped by default",
+          review: "Needs review",
+          skip: "Skipped",
+        }[row.import_action] || "New competitor/run";
+        return `<span class="status-pill ${row.import_action === "review" ? "danger-pill" : row.import_action === "update" ? "warn-pill" : row.import_action === "new" ? "good-pill" : ""}">${label}</span>`;
+      }
+
+      function updateImportSubmitSummary() {
+        const rows = [...document.querySelectorAll("[data-import-row]")];
+        const skipped = rows.filter(row => row.querySelector(`[data-import-field="skip"]`)?.checked).length;
+        const included = rows.length - skipped;
+        const missingRequired = collectImportRows({ includeSkipped: false }).filter(row => !row.entry_number || !row.driver_name);
+        document.getElementById("import-submit-summary").textContent = `${included} rows will be submitted. ${skipped} rows are skipped.${missingRequired.length ? ` ${missingRequired.length} included rows still need entry number or driver name.` : ""}`;
+      }
+
+      function cleanText(value) {
+        const text = String(value ?? "").trim();
+        return text || null;
+      }
+
+      function collectImportRows(options = {}) {
+        const includeSkipped = options.includeSkipped !== false;
+        return [...document.querySelectorAll("[data-import-row]")].map(row => {
+          const valueOf = field => row.querySelector(`[data-import-field="${field}"]`);
+          const skip = valueOf("skip").checked;
+          return {
+            import_row: Number(valueOf("import_row").value),
+            entry_number: cleanText(valueOf("entry_number").value),
+            driver_name: cleanText(valueOf("driver_name").value),
+            class_name: cleanText(valueOf("class_name").value),
+            car_name: cleanText(valueOf("car_name").value),
+            vehicle: cleanText(valueOf("vehicle").value),
+            engine: cleanText(valueOf("engine").value),
+            plate: cleanText(valueOf("plate").value),
+            sponsor: cleanText(valueOf("sponsor").value),
+            notes: cleanText(valueOf("notes").value),
+            run_type: valueOf("run_type").value || "competition",
+            skip,
+          };
+        }).filter(row => includeSkipped || !row.skip);
+      }
+
+      function showImportMessage(kind, title, body) {
+        const className = kind === "error" ? "danger-zone" : kind === "success" ? "notice good-pill" : "notice";
+        document.getElementById("import-result").innerHTML = `<div class="card ${className}"><strong>${escapeHtml(title)}</strong><pre class="muted">${escapeHtml(body)}</pre></div>`;
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+      }
+
+      document.getElementById("commit-import").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        const includedRows = collectImportRows({ includeSkipped: false });
+        const missingRequired = includedRows.filter(row => !row.entry_number || !row.driver_name);
+        if (missingRequired.length) {
+          showImportMessage(
+            "error",
+            "Import not submitted.",
+            `Fix or skip rows missing entry number or driver name first:\n${missingRequired.map(row => `File row ${row.import_row}`).join(", ")}`
+          );
+          return;
+        }
+        if (!includedRows.length) {
+          showImportMessage("error", "Import not submitted.", "Every row is currently skipped.");
+          return;
+        }
+
+        showImportMessage("info", "Submitting import...", `${includedRows.length} rows are being sent to the server.`);
+        try {
+          const data = await Kairix.withButtonFeedback(button, () => Kairix.API.post("/api/admin/competitor-import/commit", {
+            session_id: adminState.session.session_id,
+            rows: collectImportRows(),
+          }));
+          showImportMessage("success", "Import completed.", JSON.stringify(data, null, 2));
+          await refresh();
+        } catch (error) {
+          if (handleSessionError(error)) return;
+          showImportMessage("error", "Import submit failed.", error.message || String(error));
+        }
+      });
+
+      document.getElementById("add-competitor").addEventListener("click", async (event) => {
+        await Kairix.withButtonFeedback(event.currentTarget, () => Kairix.API.post("/api/admin/competitors", {
+          session_id: adminState.session.session_id,
+          entry_number: document.getElementById("manual-entry").value,
+          driver_name: document.getElementById("manual-driver").value,
+          class_name: document.getElementById("manual-class").value || null,
+          car_name: document.getElementById("manual-car").value || "Vehicle TBC",
+          engine: document.getElementById("manual-engine").value || null,
+          plate: document.getElementById("manual-plate").value || null,
+          run_type: document.getElementById("manual-run-type").value,
+          heat_number: Number(document.getElementById("manual-heat").value || 1),
+        }));
+        refresh();
+      });
+
+      document.getElementById("download-backup").addEventListener("click", async (event) => {
+        const data = await Kairix.withButtonFeedback(event.currentTarget, () => Kairix.API.get(`/api/admin/backup?session_id=${adminState.session.session_id}`));
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `kairix-backup-${Date.now()}.json`;
+        link.click();
+      });
+
+      document.getElementById("restore-backup").addEventListener("click", async (event) => {
+        const file = document.getElementById("restore-file").files[0];
+        if (!file) return;
+        if (!confirm("This will replace the managed database tables with the backup file contents.")) return;
+        const text = prompt('Type RESTORE KAIRIX to confirm restore');
+        if (text !== "RESTORE KAIRIX") return;
+        if (!confirm("Final warning. Current database records will be cleared before restore.")) return;
+        const form = new FormData();
+        form.append("file", file);
+        form.append("confirmation", text);
+        const res = await Kairix.withButtonFeedback(event.currentTarget, () => fetch(`/api/admin/restore?session_id=${adminState.session.session_id}`, { method: "POST", body: form }));
+        document.getElementById("owner-result").textContent = await res.text();
+      });
+
+      document.getElementById("clear-db").addEventListener("click", async (event) => {
+        if (!confirm("This will clear event data from the database. Download a backup first.")) return;
+        const text = prompt('Type CLEAR KAIRIX to confirm database clear');
+        if (text !== "CLEAR KAIRIX") return;
+        if (!confirm("Final warning. This removes competitors, runs, criteria, scores, delays, and audit logs. The default seed PINs will be recreated.")) return;
+        const res = await Kairix.withButtonFeedback(event.currentTarget, () => fetch(`/api/admin/danger/clear-database?session_id=${adminState.session.session_id}&confirmation=${encodeURIComponent(text)}`, { method: "POST" }));
+        document.getElementById("owner-result").textContent = await res.text();
+      });
+
+      document.getElementById("save-theme").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, async () => {
+        if (adminState.session.role !== "owner") return;
+        const state = adminState.latestEventState || await Kairix.getEventState();
+        const graphics = state.graphics || {};
+        const layoutConfig = { ...(graphics.layout_config || {}), theme: themeFromControls() };
+        await Kairix.API.post("/api/admin/graphics-state", {
+          session_id: adminState.session.session_id,
+          preset: graphics.preset || "layers",
+          enabled_layers: graphics.enabled_layers || [],
+          manual_message: graphics.manual_message || null,
+          fun_detail_mode: Boolean(graphics.fun_detail_mode),
+          show_debug_zones: false,
+          layout_config: layoutConfig,
+        });
+        Kairix.applyTheme(layoutConfig.theme);
+        await refresh();
+      }));
+
+      document.getElementById("reset-theme").addEventListener("click", event => {
+        hydrateThemeControls(defaultTheme());
+        Kairix.applyTheme(defaultTheme());
+        event.currentTarget.classList.add("pressed");
+        setTimeout(() => event.currentTarget.classList.remove("pressed"), 180);
+      });
+
+      document.querySelectorAll("[id^='theme-']").forEach(input => {
+        input.addEventListener("input", () => Kairix.applyTheme(themeFromControls()));
+      });
+
+      function hydrateConnectivityControls(config = {}) {
+        document.getElementById("conn-local-url").value = config.local_base_url || "";
+        document.getElementById("conn-cloud-url").value = config.cloud_base_url || "";
+        document.getElementById("conn-health-path").value = config.health_path || "/api/health";
+        document.getElementById("conn-timeout").value = config.request_timeout_ms || 2500;
+        document.getElementById("conn-retry-local").value = config.retry_local_after_seconds || 20;
+        document.getElementById("conn-fallback-enabled").checked = Boolean(config.fallback_enabled);
+        document.getElementById("conn-prefer-local").checked = config.prefer_local !== false;
+        document.getElementById("conn-auto-return").checked = config.auto_return_to_local !== false;
+      }
+
+      function connectivityFromControls() {
+        return {
+          session_id: adminState.session.session_id,
+          local_base_url: document.getElementById("conn-local-url").value.trim(),
+          cloud_base_url: document.getElementById("conn-cloud-url").value.trim(),
+          fallback_enabled: document.getElementById("conn-fallback-enabled").checked,
+          prefer_local: document.getElementById("conn-prefer-local").checked,
+          auto_return_to_local: document.getElementById("conn-auto-return").checked,
+          request_timeout_ms: Number(document.getElementById("conn-timeout").value || 2500),
+          retry_local_after_seconds: Number(document.getElementById("conn-retry-local").value || 20),
+          health_path: document.getElementById("conn-health-path").value.trim() || "/api/health",
+        };
+      }
+
+      async function refreshConnectivitySettings() {
+        if (adminState.session.role !== "owner") return;
+        const data = await Kairix.API.get(`/api/admin/connectivity?session_id=${adminState.session.session_id}`);
+        hydrateConnectivityControls(data.connectivity || {});
+        document.getElementById("connectivity-result").textContent = `Loaded connection settings.\nCurrent browser mode: ${Kairix.CONNECTION.mode}`;
+      }
+
+      async function testConnection(target) {
+        const config = connectivityFromControls();
+        const base = target === "cloud" ? config.cloud_base_url : config.local_base_url;
+        const url = `${String(base || "").replace(/\/+$/, "")}${config.health_path.startsWith("/") ? config.health_path : "/" + config.health_path}`;
+        if (!base) {
+          document.getElementById("connectivity-result").textContent = `No ${target} URL configured.`;
+          return;
+        }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), config.request_timeout_ms);
+        try {
+          const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+          const text = await response.text();
+          document.getElementById("connectivity-result").textContent = `${target.toUpperCase()} ${response.ok ? "OK" : "FAILED"}\n${url}\n${text}`;
+        } catch (error) {
+          document.getElementById("connectivity-result").textContent = `${target.toUpperCase()} FAILED\n${url}\n${error.message || error}`;
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+
+      document.getElementById("save-connectivity").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, async () => {
+        const data = await Kairix.API.put("/api/admin/connectivity", connectivityFromControls());
+        localStorage.setItem("kairix_connection_config", JSON.stringify(data.connectivity || {}));
+        await Kairix.loadClientConfig(true);
+        document.getElementById("connectivity-result").textContent = `Connection settings saved.\nFallback ${data.connectivity.fallback_enabled ? "enabled" : "disabled"}.`;
+      }));
+      document.getElementById("test-local-connection").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, () => testConnection("local")));
+      document.getElementById("test-cloud-connection").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, () => testConnection("cloud")));
+
+      function formatBackupAge(seconds) {
+        if (seconds == null) return "No backup yet";
+        if (seconds < 60) return `${seconds}s ago`;
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes} min ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 48) return `${hours} hr ago`;
+        return `${Math.floor(hours / 24)} days ago`;
+      }
+
+      function renderBackupHealth(data) {
+        const target = document.getElementById("backup-health");
+        if (!target) return;
+        const statusClass = data.status === "ok" ? "good-pill" : data.status === "stale" ? "warn-pill" : "danger-pill";
+        target.innerHTML = `
+          <div class="backup-health-card">
+            <span>Status</span>
+            <strong><span class="status-pill ${statusClass}">${escapeHtml(data.status || "unknown")}</span></strong>
+          </div>
+          <div class="backup-health-card">
+            <span>Latest</span>
+            <strong>${escapeHtml(formatBackupAge(data.latest_age_seconds))}</strong>
+            <code>${escapeHtml(data.latest_file || "No backup file found")}</code>
+          </div>
+          <div class="backup-health-card">
+            <span>Schedule</span>
+            <strong>${Number(data.interval_minutes || 0) ? `Every ${Number(data.interval_minutes)} min` : "Disabled"}</strong>
+            <code>Keep ${Number(data.retention_count || 0)} files</code>
+          </div>
+          <div class="backup-health-card">
+            <span>Stored Files</span>
+            <strong>${Number(data.backup_count || 0)}</strong>
+            <code>${escapeHtml(data.backup_dir || "")}</code>
+          </div>
+        `;
+      }
+
+      async function refreshBackupHealth() {
+        if (adminState.session.role !== "owner") return;
+        const data = await Kairix.API.get(`/api/admin/backup/health?session_id=${adminState.session.session_id}`);
+        renderBackupHealth(data);
+      }
+
+      document.getElementById("refresh-backup-health").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, refreshBackupHealth));
+      document.getElementById("write-server-backup").addEventListener("click", async event => {
+        const data = await Kairix.withButtonFeedback(event.currentTarget, () => fetch(`/api/admin/backup/write?session_id=${adminState.session.session_id}`, { method: "POST" }).then(res => {
+          if (!res.ok) return res.text().then(text => { throw new Error(text || res.statusText); });
+          return res.json();
+        }));
+        renderBackupHealth(data.health);
+        document.getElementById("owner-result").textContent = `Server backup written:\n${data.path}`;
+      });
+
+      function renderRecoveryReview(scores = []) {
+        const target = document.getElementById("recovery-review-list");
+        if (!target) return;
+        target.innerHTML = scores.length ? scores.map(score => {
+          const canMakeOfficial = score.status === "submitted" && score.judge_id && !score.active_for_results;
+          return `
+            <div class="queue-list-row">
+              <div>
+                <strong>${escapeHtml(score.competitor || `Run ${score.run_id}`)}</strong>
+                <span>${escapeHtml(score.judge_name || "No judge linked")} · ${escapeHtml(score.device_id || "no device")} · Total ${scoreValue(score.total)}</span>
+                <div class="mini-badges">
+                  <em>${score.active_for_results ? "OFFICIAL" : "PENDING REVIEW"}</em>
+                  <em>${escapeHtml(score.status || "unknown").toUpperCase()}</em>
+                </div>
+              </div>
+              <div class="btn-row">
+                ${canMakeOfficial ? `<button class="btn compact primary" data-recovery-official="${score.id}" data-help="Make this recovered submitted judge score official and deactivate the previous official score from the same judge/run.">Make Official</button>` : ""}
+              </div>
+            </div>
+          `;
+        }).join("") : `<p class="muted">No recovered scores imported yet.</p>`;
+      }
+
+      async function refreshRecoveryReview() {
+        if (!["high_admin", "owner"].includes(adminState.session.role)) return;
+        const data = await Kairix.API.get(`/api/admin/recovery-imports/recent?session_id=${adminState.session.session_id}`);
+        renderRecoveryReview(data.scores || []);
+      }
+
+      document.getElementById("import-recovery-data").addEventListener("click", async event => {
+        const raw = document.getElementById("recovery-import-raw").value.trim();
+        if (!raw) {
+          alert("Paste recovery JSON first.");
+          return;
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(raw);
+        } catch (error) {
+          alert(`Recovery data is not valid JSON.\n\n${error.message}`);
+          return;
+        }
+        const result = await Kairix.withButtonFeedback(event.currentTarget, () => Kairix.API.post("/api/admin/recovery-imports", {
+          session_id: adminState.session.session_id,
+          source_device_id: document.getElementById("recovery-source-device").value.trim() || null,
+          raw_payload: parsed,
+        }));
+        document.getElementById("recovery-import-result").textContent = JSON.stringify(result, null, 2);
+        await refreshRecoveryReview();
+        refresh();
+      });
+
+      document.getElementById("refresh-recovery-review").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, refreshRecoveryReview));
+
+      document.getElementById("recovery-review-list").addEventListener("click", event => {
+        const official = event.target.closest("[data-recovery-official]");
+        if (!official) return;
+        Kairix.withButtonFeedback(official, async () => {
+          if (!confirm("Make this recovered score official for results? The previous official score from the same judge/run will be deactivated.")) return false;
+          await Kairix.API.post(`/api/admin/recovery-scores/${official.dataset.recoveryOfficial}/official`, {
+            session_id: adminState.session.session_id,
+            status: "official",
+            note: "Approved from recovery review",
+          });
+          await refreshRecoveryReview();
+          await refresh();
+          return true;
+        });
+      });
+
+      async function refreshDbSummary() {
+        if (adminState.session.role !== "owner") return;
+        const data = await Kairix.API.get(`/api/admin/db/summary?session_id=${adminState.session.session_id}`);
+        document.getElementById("db-summary").innerHTML = `<table class="table"><thead><tr><th>Table</th><th>Rows</th></tr></thead><tbody>${data.tables.map(row => `<tr><td>${row.table}</td><td>${row.count}</td></tr>`).join("")}</tbody></table>`;
+        document.getElementById("db-table-select").innerHTML = data.tables.map(row => `<option value="${row.table}">${row.table} (${row.count})</option>`).join("");
+      }
+
+      document.getElementById("refresh-db").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, refreshDbSummary));
+      document.getElementById("cleanup-scoring").addEventListener("click", async event => {
+        const res = await Kairix.withButtonFeedback(event.currentTarget, () => fetch(`/api/admin/db/run-state-cleanup?session_id=${adminState.session.session_id}&mode=scoring_to_registered`, { method: "POST" }));
+        document.getElementById("db-table-output").textContent = await res.text();
+        refresh();
+        refreshDbSummary();
+      });
+      document.getElementById("cleanup-all-runs").addEventListener("click", async event => {
+        if (!confirm("Clear the state from every non-current unfinished run? This keeps the competitors and order, but resets flow states like queued, staging, on pad, and delayed.")) return;
+        const res = await Kairix.withButtonFeedback(event.currentTarget, () => fetch(`/api/admin/db/run-state-cleanup?session_id=${adminState.session.session_id}&mode=all_non_current_to_registered`, { method: "POST" }));
+        document.getElementById("db-table-output").textContent = await res.text();
+        refresh();
+        refreshDbSummary();
+      });
+      document.getElementById("load-db-table").addEventListener("click", async event => {
+        const table = document.getElementById("db-table-select").value;
+        const limit = document.getElementById("db-table-limit").value;
+        const data = await Kairix.withButtonFeedback(event.currentTarget, () => Kairix.API.get(`/api/admin/db/table/${table}?session_id=${adminState.session.session_id}&limit=${limit}`));
+        const columns = data.rows[0] ? Object.keys(data.rows[0]) : [];
+        document.getElementById("db-table-output").innerHTML = data.rows.length
+          ? `<table class="table"><thead><tr>${columns.map(col => `<th>${col}</th>`).join("")}</tr></thead><tbody>${data.rows.map(row => `<tr>${columns.map(col => `<td>${escapeHtml(row[col] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+          : "<p class='muted'>No rows.</p>";
+      });
+
+      async function guardedRefresh() {
+        try {
+          await refresh();
+        } catch (error) {
+          if (handleSessionError(error)) return;
+          console.error(error);
+        }
+      }
+
+      async function guardedRefreshDbSummary() {
+        try {
+          await refreshDbSummary();
+        } catch (error) {
+          if (handleSessionError(error)) return;
+          console.error(error);
+        }
+      }
+
+      async function guardedRefreshBackupHealth() {
+        try {
+          await refreshBackupHealth();
+        } catch (error) {
+          if (handleSessionError(error)) return;
+          console.error(error);
+        }
+      }
+
+      async function guardedRefreshRecoveryReview() {
+        try {
+          await refreshRecoveryReview();
+        } catch (error) {
+          if (handleSessionError(error)) return;
+          console.error(error);
+        }
+      }
+
+      async function guardedRefreshConnectivitySettings() {
+        try {
+          await refreshConnectivitySettings();
+        } catch (error) {
+          if (handleSessionError(error)) return;
+          console.error(error);
+        }
+      }
+
+      guardedRefresh();
+      guardedRefreshDbSummary();
+      guardedRefreshBackupHealth();
+      guardedRefreshRecoveryReview();
+      guardedRefreshConnectivitySettings();
+      setInterval(renderTimerReadout, 1000);
+      setInterval(renderAdminDelayReadout, 1000);
+      setInterval(() => renderRunHeatControl(adminState.latestEventState), 1000);
+      setInterval(guardedRefresh, 4000);
+      setInterval(guardedRefreshBackupHealth, 60000);
+    </script>
+  </body>
+</html>

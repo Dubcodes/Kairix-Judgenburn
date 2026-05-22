@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kairix_judging}
+      POSTGRES_USER: ${POSTGRES_USER:-kairix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kairix_dev_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kairix} -d ${POSTGRES_DB:-kairix_judging}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  web:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-kairix}:${POSTGRES_PASSWORD:-kairix_dev_password}@db:5432/${POSTGRES_DB:-kairix_judging}
+      APP_NAME: ${APP_NAME:-Kairix Judgenburn}
+      BACKUP_DIR: ${BACKUP_DIR:-/app/backups}
+      AUTO_BACKUP_INTERVAL_MINUTES: ${AUTO_BACKUP_INTERVAL_MINUTES:-30}
+      AUTO_BACKUP_RETENTION_COUNT: ${AUTO_BACKUP_RETENTION_COUNT:-48}
+    ports:
+      - "${HOST_PORT:-7080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./backups:/app/backups
+    restart: unless-stopped
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: kairix-temp-tunnel
+    command: tunnel --no-autoupdate --url http://web:8080
+    depends_on:
+      - web
+    restart: unless-stopped
+    profiles:
+      - tunnel
+
+volumes:
+  postgres_data:

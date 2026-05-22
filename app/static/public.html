@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kairix Public Display</title>
+    <link rel="icon" href="/static/kairix-judging-system-logo.png">
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body class="public-display-body" data-kairix-auto-live="false">
+    <main class="page wide public-display-page">
+      <div class="topline public-topline">
+        <div class="brand-block">
+          <div class="brand-row">
+            <img class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
+            <div>
+              <div id="public-event-name" class="brand">Public Display</div>
+              <div id="public-event-meta" class="muted">Loading event</div>
+            </div>
+          </div>
+        </div>
+        <nav id="public-tabs" class="public-tabs" aria-label="Public display views">
+          <button class="btn compact" data-view="venue">Venue</button>
+          <button class="btn compact" data-view="current">Current</button>
+          <button class="btn compact" data-view="leaderboard">Leaderboard</button>
+          <button class="btn compact" data-view="queue">Run Order</button>
+          <button class="btn compact" data-view="status">Status</button>
+        </nav>
+      </div>
+
+      <div class="queue-meta public-meta">
+        <span id="public-updated" class="muted">Waiting for first update.</span>
+        <span id="public-feed-state" class="status-pill">Connecting</span>
+      </div>
+
+      <section id="public-health" class="card danger-zone queue-health" style="display:none;">
+        <strong>Display may be stale.</strong>
+        <p id="public-health-text" class="muted">Waiting for the next successful update.</p>
+      </section>
+
+      <section id="public-view" class="public-view-shell"></section>
+    </main>
+
+    <script src="/static/js/common.js"></script>
+    <script>
+      const PUBLIC_VIEWS = new Set(["venue", "current", "leaderboard", "queue", "status"]);
+      let activeView = initialView();
+      let latestState = null;
+      let lastSuccessAt = 0;
+      let lastFailureReason = "";
+      let venueCycle = 0;
+
+      function initialView() {
+        const queryView = new URLSearchParams(window.location.search).get("view");
+        const pathView = window.location.pathname.split("/").filter(Boolean)[1];
+        return PUBLIC_VIEWS.has(queryView) ? queryView : PUBLIC_VIEWS.has(pathView) ? pathView : "venue";
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, char => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        }[char]));
+      }
+
+      function formatState(value) {
+        return String(value || "not assigned").replaceAll("_", " ");
+      }
+
+      function setView(view, push = true) {
+        activeView = PUBLIC_VIEWS.has(view) ? view : "venue";
+        document.querySelectorAll("[data-view]").forEach(button => {
+          button.classList.toggle("active-state", button.dataset.view === activeView);
+        });
+        if (push) {
+          const nextPath = activeView === "venue" ? "/public" : `/public/${activeView}`;
+          window.history.replaceState(null, "", nextPath);
+        }
+        render();
+      }
+
+      function scoreLine(run) {
+        if (!latestState?.settings?.show_public_total_scores) return "";
+        const total = run?.score?.competitor_total;
+        if (total === null || total === undefined) return "";
+        const label = run.score?.result_mode_label || latestState.settings?.result_mode_label || "Total";
+        return `<div class="public-score-line">${escapeHtml(label)}: ${Number(total).toFixed(1)}</div>`;
+      }
+
+      function runMeta(run) {
+        if (!run) return "";
+        const parts = [
+          `Heat ${run.heat_number || latestState?.status?.current_heat || 1}`,
+          run.run_type,
+          formatState(run.state),
+          run.competitor?.class_name,
+        ].filter(Boolean);
+        return parts.map(escapeHtml).join(" / ");
+      }
+
+      function renderRunCard(run, label = "", options = {}) {
+        if (!run) {
+          return `
+            <div class="public-run-card empty">
+              ${label ? `<span>${escapeHtml(label)}</span>` : ""}
+              <strong>No competitor selected</strong>
+              <em>Waiting for run control</em>
+            </div>
+          `;
+        }
+        const car = run.vehicle?.name || "Vehicle TBC";
+        const away = run.cars_away ? `<em>${run.cars_away} car${run.cars_away === 1 ? "" : "s"} away</em>` : "";
+        return `
+          <div class="public-run-card ${options.feature ? "feature" : ""}">
+            ${label ? `<span>${escapeHtml(label)}</span>` : ""}
+            <strong>#${escapeHtml(run.competitor?.entry_number)} ${escapeHtml(run.competitor?.driver_name)}</strong>
+            <small>${escapeHtml(car)}</small>
+            <em>${runMeta(run)}</em>
+            ${away}
+            ${scoreLine(run)}
+          </div>
+        `;
+      }
+
+      function timerText() {
+        if (!latestState?.timer) return "00:00";
+        return Kairix.formatSeconds(Kairix.timerDisplaySeconds(latestState.timer));
+      }
+
+      function delayHtml() {
+        const delay = latestState?.delay;
+        if (!delay) return "";
+        return `
+          <section class="public-delay-band">
+            <span>Delay</span>
+            <strong>${escapeHtml(delay.message || "Delay")}</strong>
+            <em>${escapeHtml(delay.countdown_text || "Updates coming")}</em>
+          </section>
+        `;
+      }
+
+      function renderVenue() {
+        const state = latestState || {};
+        const current = state.current_run;
+        const next = state.next_runs || [];
+        if (state.delay) {
+          return `
+            ${delayHtml()}
+            <div class="public-split-grid">
+              ${renderRunCard(current, "Current Runner", { feature: true })}
+              <section class="public-panel">
+                <h2>Next Up</h2>
+                <div class="public-run-stack">${next.slice(0, 3).map((run, index) => renderRunCard(run, `${index + 1} away`)).join("") || renderRunCard(null)}</div>
+              </section>
+            </div>
+          `;
+        }
+        if (current) {
+          return `
+            <section class="public-current-hero">
+              <span>Current Runner</span>
+              <h1>#${escapeHtml(current.competitor?.entry_number)} ${escapeHtml(current.competitor?.driver_name)}</h1>
+              <p>${escapeHtml(current.vehicle?.name || "Vehicle TBC")}</p>
+              <div class="public-hero-meta">${runMeta(current)}</div>
+              <div class="public-hero-timer" data-public-timer>${timerText()}</div>
+              ${scoreLine(current)}
+            </section>
+            <section class="public-panel section-gap-md">
+              <h2>Next Up</h2>
+              <div class="public-next-grid">${next.slice(0, 3).map((run, index) => renderRunCard(run, `${index + 1} away`)).join("") || renderRunCard(null)}</div>
+            </section>
+          `;
+        }
+        return venueCycle % 2 === 0
+          ? `<div class="public-split-grid">${renderLeaderboard(true)}${renderQueue(true)}</div>`
+          : `<div class="public-split-grid">${renderQueue(true)}${renderLeaderboard(true)}</div>`;
+      }
+
+      function renderCurrent() {
+        const next = latestState?.next_runs || [];
+        return `
+          ${delayHtml()}
+          <section class="public-current-hero compact">
+            <span>Current Runner</span>
+            <h1>${latestState?.current_run ? `#${escapeHtml(latestState.current_run.competitor?.entry_number)} ${escapeHtml(latestState.current_run.competitor?.driver_name)}` : "No current runner"}</h1>
+            <p>${escapeHtml(latestState?.current_run?.vehicle?.name || "Waiting for run control")}</p>
+            <div class="public-hero-meta">${latestState?.current_run ? runMeta(latestState.current_run) : `Heat ${latestState?.status?.current_heat || 1}`}</div>
+            <div class="public-hero-timer" data-public-timer>${timerText()}</div>
+            ${scoreLine(latestState?.current_run)}
+          </section>
+          <section class="public-panel section-gap-md">
+            <h2>Next Up</h2>
+            <div class="public-next-grid">${next.slice(0, 6).map((run, index) => renderRunCard(run, `${index + 1} away`)).join("") || renderRunCard(null)}</div>
+          </section>
+        `;
+      }
+
+      function renderLeaderboard(compact = false) {
+        const rows = latestState?.leaderboard || [];
+        if (!latestState?.settings?.show_public_total_scores) {
+          return `
+            <section class="public-panel ${compact ? "compact-panel" : ""}">
+              <h2>Leaderboard</h2>
+              <p class="muted">Scores are hidden by event settings.</p>
+            </section>
+          `;
+        }
+        return `
+          <section class="public-panel ${compact ? "compact-panel" : ""}">
+            <div class="public-panel-head">
+              <h2>Leaderboard</h2>
+              <span class="status-pill">${escapeHtml(latestState?.settings?.result_mode_label || "All heats")}</span>
+            </div>
+            <div class="public-table">
+              ${rows.length ? rows.map(row => `
+                <div class="public-table-row">
+                  <span>${row.position || ""}</span>
+                  <strong>#${escapeHtml(row.entry_number)} ${escapeHtml(row.driver_name)}</strong>
+                  <em>${escapeHtml(row.vehicle_name || "Vehicle TBC")}</em>
+                  <b>${row.total === null || row.total === undefined ? "-" : Number(row.total).toFixed(1)}</b>
+                </div>
+              `).join("") : `<p class="muted">No official scores yet.</p>`}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderQueue(compact = false) {
+        const rows = latestState?.run_order || [];
+        return `
+          <section class="public-panel ${compact ? "compact-panel" : ""}">
+            <div class="public-panel-head">
+              <h2>Run Order</h2>
+              <span class="status-pill">Heat ${latestState?.status?.current_heat || 1}</span>
+            </div>
+            <div class="public-run-list">
+              ${rows.length ? rows.map(run => `
+                <div class="public-run-list-row ${run.key === latestState?.current_run?.key ? "current" : ""}">
+                  <span>${run.cars_away === 0 ? "Now" : run.cars_away ? `${run.cars_away} away` : ""}</span>
+                  <strong>#${escapeHtml(run.competitor?.entry_number)} ${escapeHtml(run.competitor?.driver_name)}</strong>
+                  <em>${escapeHtml(run.vehicle?.name || "Vehicle TBC")}</em>
+                  <b>${escapeHtml(formatState(run.state))}</b>
+                </div>
+              `).join("") : `<p class="muted">No queued competitors yet.</p>`}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderStatus() {
+        const event = latestState?.event || {};
+        const current = latestState?.current_run;
+        const next = latestState?.next_runs?.[0];
+        return `
+          ${delayHtml()}
+          <div class="public-status-grid">
+            <section class="public-panel">
+              <h2>Event</h2>
+              <div class="queue-state-lines">
+                <div><span>Name</span><strong>${escapeHtml(event.name || "Event")}</strong></div>
+                <div><span>Venue</span><strong>${escapeHtml(event.venue || "Venue TBC")}</strong></div>
+                <div><span>Heat</span><strong>${latestState?.status?.current_heat || 1}</strong></div>
+                <div><span>Timer</span><strong data-public-timer>${timerText()}</strong></div>
+              </div>
+            </section>
+            <section class="public-panel">
+              <h2>Current</h2>
+              ${renderRunCard(current, "")}
+            </section>
+            <section class="public-panel">
+              <h2>Next</h2>
+              ${renderRunCard(next, "")}
+            </section>
+          </div>
+        `;
+      }
+
+      function render() {
+        document.querySelectorAll("[data-view]").forEach(button => {
+          button.classList.toggle("active-state", button.dataset.view === activeView);
+        });
+        const shell = document.getElementById("public-view");
+        if (!latestState) {
+          shell.innerHTML = `<section class="public-panel"><h2>Loading</h2><p class="muted">Waiting for event data.</p></section>`;
+          return;
+        }
+        const event = latestState.event || {};
+        document.getElementById("public-event-name").textContent = event.name || "Public Display";
+        document.getElementById("public-event-meta").textContent = [event.venue, event.event_date].filter(Boolean).join(" / ") || "Live event";
+        shell.innerHTML = {
+          venue: renderVenue,
+          current: renderCurrent,
+          leaderboard: () => renderLeaderboard(false),
+          queue: () => renderQueue(false),
+          status: renderStatus,
+        }[activeView]();
+      }
+
+      function renderFreshness() {
+        const ageSeconds = lastSuccessAt ? Math.max(0, Math.floor((Date.now() - lastSuccessAt) / 1000)) : null;
+        document.getElementById("public-updated").textContent = ageSeconds === null
+          ? "Waiting for first update."
+          : `Last updated ${ageSeconds}s ago.`;
+        const stale = ageSeconds === null || ageSeconds > 15;
+        document.getElementById("public-health").style.display = stale ? "block" : "none";
+        if (stale) {
+          document.getElementById("public-health-text").textContent = lastFailureReason || "This public display has not updated recently.";
+        }
+      }
+
+      function renderLiveTimer() {
+        document.querySelectorAll("[data-public-timer]").forEach(item => {
+          item.textContent = timerText();
+        });
+      }
+
+      async function refresh() {
+        try {
+          const state = await Kairix.API.get("/api/public/snapshot");
+          if (state.timer) state.timer = Kairix.stampTimer(state.timer);
+          latestState = state;
+          lastSuccessAt = Date.now();
+          lastFailureReason = "";
+          document.getElementById("public-feed-state").textContent = "Live";
+          document.getElementById("public-feed-state").className = "status-pill good-pill";
+          render();
+        } catch (error) {
+          lastFailureReason = error.message || "Public snapshot refresh failed.";
+          document.getElementById("public-feed-state").textContent = "Offline";
+          document.getElementById("public-feed-state").className = "status-pill danger-pill";
+        } finally {
+          renderFreshness();
+        }
+      }
+
+      document.getElementById("public-tabs").addEventListener("click", event => {
+        const button = event.target.closest("[data-view]");
+        if (!button) return;
+        setView(button.dataset.view);
+      });
+
+      setView(activeView, false);
+      refresh();
+      setInterval(refresh, 4000);
+      setInterval(renderFreshness, 1000);
+      setInterval(renderLiveTimer, 1000);
+      setInterval(() => {
+        venueCycle += 1;
+        if (activeView === "venue" && latestState && !latestState.current_run && !latestState.delay) render();
+      }, 12000);
+    </script>
+  </body>
+</html>

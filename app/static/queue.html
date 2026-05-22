@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Competitor Queue</title>
+    <link rel="icon" href="/static/kairix-judging-system-logo.png">
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body data-kairix-auto-live="false">
+    <main class="page queue-page">
+      <div class="topline">
+        <div class="brand-block">
+          <div class="brand-row">
+            <img class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
+            <div class="brand">Competitor Queue</div>
+          </div>
+          <div id="delay" class="muted">Loading delay status</div>
+        </div>
+        <a class="btn" href="/" data-help="Return to the landing page and PIN login.">Home</a>
+      </div>
+      <section id="queue-health" class="card danger-zone queue-health" style="display:none;">
+        <strong>Display may be stale.</strong>
+        <p id="queue-health-text" class="muted">Waiting for the next successful update.</p>
+      </section>
+      <div class="queue-meta">
+        <span id="queue-updated" class="muted">Waiting for first update.</span>
+        <span id="queue-event" class="status-pill">Checking event</span>
+      </div>
+      <section class="queue-status-grid">
+        <section id="current" class="card"></section>
+        <section id="event-state" class="card"></section>
+      </section>
+      <h2 class="section-title">Next Up</h2>
+      <section id="queue" class="vertical-list compact-list"></section>
+    </main>
+    <script src="/static/js/common.js"></script>
+    <script>
+      let latestTimer = null;
+      let lastSuccessAt = 0;
+      let lastFailureReason = "";
+
+      function formatSeconds(value) {
+        return Kairix.formatSeconds(value);
+      }
+
+      function renderFreshness() {
+        const ageSeconds = lastSuccessAt ? Math.max(0, Math.floor((Date.now() - lastSuccessAt) / 1000)) : null;
+        document.getElementById("queue-updated").textContent = ageSeconds === null
+          ? "Waiting for first update."
+          : `Last updated ${ageSeconds}s ago.`;
+        const stale = ageSeconds === null || ageSeconds > 10;
+        const healthCard = document.getElementById("queue-health");
+        if (stale) {
+          healthCard.style.display = "block";
+          document.getElementById("queue-health-text").textContent = lastFailureReason || "This display has not updated recently. Confirm the event control page is still online.";
+        } else {
+          healthCard.style.display = "none";
+        }
+      }
+
+      function renderTimer() {
+        const timerEl = document.getElementById("run-timer");
+        if (!timerEl) return;
+        if (!latestTimer) {
+          timerEl.textContent = "00:00";
+          return;
+        }
+        const display = Kairix.timerDisplaySeconds(latestTimer);
+        timerEl.textContent = formatSeconds(display);
+      }
+
+      function competitorTotalHtml(run, state) {
+        if (!state.settings?.show_public_total_scores) return "";
+        const total = run?.score?.competitor_total;
+        if (total === null || total === undefined) return "";
+        const label = run.score?.result_mode_label || state.settings?.result_mode_label || "Total";
+        return `<span class="queue-score-line">${label}: ${Number(total).toFixed(1)}</span>`;
+      }
+
+      async function refresh(liveState = null) {
+        try {
+          const state = liveState || await Kairix.API.get("/api/public/snapshot");
+          latestTimer = state.timer ? Kairix.stampTimer(state.timer) : null;
+          lastSuccessAt = Date.now();
+          lastFailureReason = "";
+          document.getElementById("queue-event").textContent = state.event?.name || "Live event";
+          document.getElementById("queue-event").className = "status-pill good-pill";
+          renderTimer();
+          document.getElementById("delay").textContent = state.delay
+            ? `${state.delay.message}${state.delay.countdown_text ? " - " + state.delay.countdown_text : ""}`
+            : "No active delay";
+          document.getElementById("event-state").innerHTML = `
+            <h2>Event State</h2>
+            <div class="queue-state-lines">
+              <div><span>Delay</span><strong>${state.delay ? `${state.delay.message}${state.delay.countdown_text ? " - " + state.delay.countdown_text : ""}` : "No active delay"}</strong></div>
+              <div><span>Run Timer</span><strong id="run-timer" class="queue-inline-timer">00:00</strong></div>
+              <div><span>Heat</span><strong>${state.status?.current_heat || state.current_heat || 1}</strong></div>
+            </div>
+          `;
+          renderTimer();
+          document.getElementById("current").innerHTML = `
+            <h2>Current on pad</h2>
+            <div class="queue-current-name">${Kairix.formatRun(state.current_run)}</div>
+            <div class="muted">${state.current_run?.run_type || ""}${state.current_run?.state ? " / " + state.current_run.state : ""}</div>
+            ${competitorTotalHtml(state.current_run, state)}
+          `;
+          document.getElementById("queue").innerHTML = (state.run_order || state.queue || [])
+            .filter(run => run.key !== state.current_run?.key)
+            .map(run => `<div class="queue-list-row"><div><strong>${Kairix.formatRun(run)}</strong><span>${run.run_type}</span>${competitorTotalHtml(run, state)}</div><span class="status-pill">${run.state || "not assigned"}</span></div>`)
+            .join("");
+        } catch (error) {
+          lastFailureReason = error.message || "Live queue refresh failed.";
+          document.getElementById("queue-event").textContent = "Feed offline";
+          document.getElementById("queue-event").className = "status-pill danger-pill";
+        } finally {
+          renderFreshness();
+        }
+      }
+      refresh();
+      setInterval(refresh, 4000);
+      setInterval(renderTimer, 1000);
+      setInterval(renderFreshness, 1000);
+    </script>
+  </body>
+</html>

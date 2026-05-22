@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Graphics Settings</title>
+    <link rel="icon" href="/static/kairix-judging-system-logo.png">
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <main class="page wide">
+      <div class="topline">
+        <div class="brand-block">
+          <div class="brand-row">
+            <img class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
+            <div class="brand">Graphics Settings</div>
+          </div>
+          <div id="who" class="muted">Loading session...</div>
+        </div>
+        <div class="btn-row">
+          <a class="btn" href="/gfx-control" data-help="Return to the live graphics layer controls.">Graphics Control</a>
+          <a class="btn" href="/obs-overlay" data-help="Open the transparent OBS browser overlay.">Open Overlay</a>
+          <a class="btn high-admin-link" href="/admin" data-help="Go to event control. High-admin and owner only.">Event Control</a>
+        </div>
+      </div>
+
+      <section class="grid">
+        <div class="card">
+          <h2>Follow Behaviour</h2>
+          <label>Current graphic follow mode
+            <select id="follow-mode">
+              <option value="direct">Direct follow admin current</option>
+              <option value="loose">Loose follow while live</option>
+            </select>
+          </label>
+          <p class="muted">Loose follow freezes a live current/up-next layer until that layer is hidden.</p>
+        </div>
+
+        <div class="card">
+          <h2>Current Competitor Fields</h2>
+          <label class="check"><input id="field-run-type" type="checkbox"> Show run type</label>
+          <label class="check"><input id="field-state" type="checkbox" checked> Show run state</label>
+          <label class="check"><input id="field-class" type="checkbox"> Show class</label>
+          <label class="check"><input id="field-engine" type="checkbox" checked> Show engine</label>
+          <label class="check"><input id="field-score" type="checkbox"> Show total score</label>
+        </div>
+
+        <div class="card">
+          <h2>Up Next Fields</h2>
+          <label class="check"><input id="up-field-label" type="checkbox" checked> Show Up Next / distance label</label>
+          <label class="check"><input id="up-field-car" type="checkbox" checked> Show vehicle</label>
+          <label class="check"><input id="up-field-engine" type="checkbox"> Show engine</label>
+          <label class="check"><input id="up-field-class" type="checkbox"> Show class</label>
+          <label class="check"><input id="up-field-score" type="checkbox"> Show total score</label>
+        </div>
+
+        <div class="card">
+          <h2>Judge Heat</h2>
+          <div class="grid tight">
+            <label>Label <input id="heat-display-label" value="Judge Heat"></label>
+            <label>Score item max <input id="heat-score-max" type="number" min="1" value="10"></label>
+            <label>Mode
+              <select id="heat-mode">
+                <option value="live">Live from judge drafts</option>
+                <option value="manual">Manual override</option>
+              </select>
+            </label>
+            <label>Manual value <input id="heat-value" type="range" min="0" max="100" value="0"><span id="heat-value-text">0</span></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Timer Style</h2>
+          <div class="grid tight">
+            <label>Orange after over seconds <input id="timer-warn" type="number" min="0" value="0"></label>
+            <label>Red after over seconds <input id="timer-danger" type="number" min="0" value="10"></label>
+            <label>Wiggle amount <input id="timer-shake" type="range" min="0" max="18" value="3"><span id="timer-shake-text">3px</span></label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Logo Layer</h2>
+          <div class="grid tight">
+            <label>Upload PNG <input id="logo-upload" type="file" accept="image/png"></label>
+            <button id="upload-logo" class="btn compact" data-help="Upload the selected PNG logo to the server so it can be used by the OBS overlay.">Upload Logo</button>
+            <label>Opacity with other layers <input id="logo-opacity-active" type="range" min="0" max="100" value="70"><span id="logo-opacity-active-text">70%</span></label>
+            <label>Opacity when alone <input id="logo-opacity-idle" type="range" min="0" max="100" value="25"><span id="logo-opacity-idle-text">25%</span></label>
+          </div>
+          <div class="logo-manager">
+            <div class="muted">Selected logo: <span id="selected-logo">No logo selected</span></div>
+            <div id="logo-list" class="vertical-list compact-list"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Layout File</h2>
+          <p class="muted">Download a known-good graphics layout or import one from another Kairix event.</p>
+          <div class="grid tight">
+            <div class="align-end">
+              <button id="export-layout" class="btn compact" data-help="Download the current graphics layout, hotkeys, and visible-layer settings as a JSON file.">Export Layout</button>
+            </div>
+            <label>Import JSON <input id="layout-import-file" type="file" accept=".json,application/json"></label>
+            <div class="align-end">
+              <button id="import-layout" class="btn compact primary" data-help="Import a saved graphics layout JSON file into this event.">Import Layout</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card section-gap-md">
+        <div class="section-head">
+          <div>
+            <h2>Visual Layout</h2>
+            <p class="muted">Click a layer box to select it. Use the sliders below to position and style it.</p>
+          </div>
+          <div class="btn-row">
+            <button id="reset-layout" class="btn compact" data-help="Reset all overlay layer positions to defaults.">Reset Layout</button>
+            <button id="save-top" class="btn compact primary" data-help="Save all graphics settings.">Save Settings</button>
+          </div>
+        </div>
+        <div id="layout-canvas" class="gfx-layout-canvas compact-preview">
+          <button type="button" class="gfx-layout-box" data-layout-box="lower" data-help="Select the current competitor lower-third layer for layout and style controls."><span>Current</span></button>
+          <button type="button" class="gfx-layout-box" data-layout-box="upnext" data-help="Select the Up Next layer for layout and style controls."><span>Up Next</span></button>
+          <button type="button" class="gfx-layout-box" data-layout-box="delay" data-help="Select the delay layer for layout and style controls."><span>Delay</span></button>
+          <button type="button" class="gfx-layout-box" data-layout-box="meter" data-help="Select the judge heat layer for layout and style controls."><span>Judge Heat</span></button>
+          <button type="button" class="gfx-layout-box" data-layout-box="timer" data-help="Select the timer layer for layout and style controls."><span>Timer</span></button>
+          <button type="button" class="gfx-layout-box" data-layout-box="manual" data-help="Select the manual message layer for layout and style controls."><span>Message</span></button>
+          <button type="button" class="gfx-layout-box" data-layout-box="logo" data-help="Select the PNG logo layer for layout and style controls."><span>Logo</span></button>
+          <button type="button" class="gfx-layout-box" data-layout-box="leaderboard_full" data-help="Select the full leaderboard layer for layout and style controls."><span>Leaderboard Full</span></button>
+          <button type="button" class="gfx-layout-box" data-layout-box="leaderboard_side" data-help="Select the side leaderboard layer for layout and style controls."><span>Leaderboard Side</span></button>
+          <button type="button" class="gfx-layout-box" data-layout-box="scoreboard_full" data-help="Select the full-screen scoreboard table layer for layout and style controls."><span>Scoreboard Full</span></button>
+          <button type="button" class="gfx-layout-box" data-layout-box="scoreboard_detail" data-help="Select the full-screen detailed scoreboard layer for layout and style controls."><span>Scoreboard Detail</span></button>
+        </div>
+        <p id="selected-layer-note" class="muted">Selected: Current.</p>
+        <div id="selected-layer-controls" class="selected-layer-controls"></div>
+      </section>
+
+      <section class="card section-gap-md">
+        <h2>Layer Settings</h2>
+        <div id="layer-settings" class="layer-settings-grid"></div>
+      </section>
+
+      <section class="card section-gap-md">
+        <div class="section-head">
+          <div>
+            <h2>Default Active Layers</h2>
+            <p class="muted">These are the layers currently active on the overlay. The live graphics page can still toggle them instantly.</p>
+          </div>
+          <button id="save" class="btn primary" data-help="Save graphics layout, hotkeys, visible fields, and style settings.">Save Settings</button>
+        </div>
+        <div class="btn-row">
+          <label class="check"><input data-default-layer type="checkbox" value="current_competitor"> Current</label>
+          <label class="check"><input data-default-layer type="checkbox" value="up_next"> Up Next</label>
+          <label class="check"><input data-default-layer type="checkbox" value="delay"> Delay</label>
+          <label class="check"><input data-default-layer type="checkbox" value="judge_likeness"> Judge Heat</label>
+          <label class="check"><input data-default-layer type="checkbox" value="timer"> Timer</label>
+          <label class="check"><input data-default-layer type="checkbox" value="manual_message"> Message</label>
+          <label class="check"><input data-default-layer type="checkbox" value="logo"> Logo</label>
+          <label class="check"><input data-default-layer type="checkbox" value="leaderboard_full"> Leaderboard Full</label>
+          <label class="check"><input data-default-layer type="checkbox" value="leaderboard_side"> Leaderboard Side</label>
+          <label class="check"><input data-default-layer type="checkbox" value="scoreboard_full"> Scoreboard Full</label>
+          <label class="check"><input data-default-layer type="checkbox" value="scoreboard_detail"> Scoreboard Detail</label>
+        </div>
+        <p id="save-status" class="muted"></p>
+      </section>
+    </main>
+
+    <script src="/static/js/common.js?v=20260505-logo-manager"></script>
+    <script>
+      (() => {
+        const canvas = { width: 1920, height: 1080 };
+        const fonts = ["Arial", "Impact", "Trebuchet MS", "Verdana", "Georgia"];
+        const aligns = ["left", "center", "right"];
+        const animations = ["fade", "none", "slide-up", "slide-down", "slide-left", "slide-right", "pop", "zoom", "drop", "rise"];
+        const layers = {
+          lower: { id: "current_competitor", label: "Current", hotkey: "C", x: 56, y: 760, w: 760, animation: "slide-up", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+          upnext: { id: "up_next", label: "Up Next", hotkey: "U", x: 1330, y: 190, w: 500, animation: "slide-left", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+          delay: { id: "delay", label: "Delay", hotkey: "D", x: 480, y: 38, w: 960, animation: "fade", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "center", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+          meter: { id: "judge_likeness", label: "Judge Heat", hotkey: "J", x: 1444, y: 790, w: 420, animation: "slide-up", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+          timer: { id: "timer", label: "Timer", hotkey: "T", x: 820, y: 780, w: 280, animation: "slide-up", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "center", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+          manual: { id: "manual_message", label: "Message", hotkey: "M", x: 360, y: 410, w: 1200, animation: "pop", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "center", padding: 18, bg_alpha: 78, text_color: "#ffffff" },
+          logo: { id: "logo", label: "Logo", hotkey: "L", x: 1540, y: 42, w: 300, animation: "fade", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "center", padding: 0, bg_alpha: 0, text_color: "#ffffff" },
+          leaderboard_full: { id: "leaderboard_full", label: "Leaderboard Full", hotkey: "F", x: 240, y: 140, w: 1440, animation: "pop", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 28, bg_alpha: 82, text_color: "#ffffff" },
+          leaderboard_side: { id: "leaderboard_side", label: "Leaderboard Side", hotkey: "S", x: 48, y: 150, w: 640, animation: "slide-right", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 20, bg_alpha: 82, text_color: "#ffffff" },
+          scoreboard_full: { id: "scoreboard_full", label: "Scoreboard Full", hotkey: "B", x: 100, y: 70, w: 1720, animation: "pop", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 30, bg_alpha: 84, text_color: "#ffffff" },
+          scoreboard_detail: { id: "scoreboard_detail", label: "Scoreboard Detail", hotkey: "R", x: 130, y: 86, w: 1660, animation: "zoom", font_scale: 100, font_family: "Arial", font_weight: 900, text_align: "left", padding: 30, bg_alpha: 84, text_color: "#ffffff" },
+        };
+        const layerKeys = Object.keys(layers);
+        const boardLayerIds = new Set(["leaderboard_full", "leaderboard_side", "scoreboard_full", "scoreboard_detail"]);
+        let session = null;
+        let activeLayer = "lower";
+        let graphics = { enabled_layers: [], manual_message: null, fun_detail_mode: false, layout_config: {} };
+        let layout = JSON.parse(JSON.stringify(layers));
+        let logoFiles = [];
+
+        function escapeHtml(value) {
+          return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+        }
+
+        function escapeAttr(value) {
+          return escapeHtml(value).replace(/`/g, "&#96;");
+        }
+
+        function status(message, danger = false) {
+          const el = document.getElementById("save-status");
+          el.textContent = message;
+          el.classList.toggle("danger-text", danger);
+        }
+
+        function clamp(value, min, max) {
+          const number = Number(value);
+          if (!Number.isFinite(number)) return min;
+          return Math.max(min, Math.min(max, number));
+        }
+
+        function clean(key, raw = {}) {
+          const base = { ...layers[key], ...raw };
+          base.w = clamp(base.w, 160, canvas.width);
+          base.x = clamp(base.x, 0, canvas.width - base.w);
+          base.y = clamp(base.y, 0, canvas.height - 80);
+          base.font_scale = clamp(base.font_scale, 50, 180);
+          base.font_weight = clamp(base.font_weight, 300, 1000);
+          base.padding = clamp(base.padding, 0, 50);
+          base.bg_alpha = clamp(base.bg_alpha, 0, 100);
+          base.text_color = /^#[0-9a-fA-F]{6}$/.test(base.text_color || "") ? base.text_color : layers[key].text_color;
+          base.font_family = fonts.includes(base.font_family) ? base.font_family : layers[key].font_family;
+          base.text_align = aligns.includes(base.text_align) ? base.text_align : layers[key].text_align;
+          base.animation = animations.includes(base.animation) ? base.animation : layers[key].animation;
+          return base;
+        }
+
+        function slider(key, field, label, min, max) {
+          const value = layout[key][field];
+          return `
+            <label class="layout-slider-line">
+              ${label}
+              <input type="range" min="${min}" max="${max}" value="${value}" data-layout="${key}" data-field="${field}">
+              <input class="layout-number" type="number" min="${min}" max="${max}" value="${value}" data-layout="${key}" data-field="${field}">
+            </label>
+          `;
+        }
+
+        function selectControl(key, field, label, options) {
+          const value = layout[key][field];
+          return `<label>${label}<select data-layout="${key}" data-field="${field}">${options.map(option => `<option value="${option}" ${option === value ? "selected" : ""}>${option}</option>`).join("")}</select></label>`;
+        }
+
+        function selectedControlsHtml(key) {
+          const item = layout[key];
+          return `
+            <div class="selected-layer-title">
+              <strong>${item.label}</strong>
+              <span class="muted">Horizontal ${Math.round(item.x)} / Vertical ${Math.round(item.y)} / Width ${Math.round(item.w)}px</span>
+            </div>
+            <div class="selected-slider-grid">
+              ${slider(key, "x", "Horizontal", 0, canvas.width)}
+              ${slider(key, "y", "Vertical", 0, canvas.height)}
+              ${slider(key, "w", "Width", 160, canvas.width)}
+              ${slider(key, "font_scale", "Text", 50, 180)}
+              ${slider(key, "font_weight", "Weight", 300, 1000)}
+              ${slider(key, "padding", "Pad", 0, 50)}
+              ${slider(key, "bg_alpha", "BG %", 0, 100)}
+              <label class="layout-slider-line color-line">Color<input type="color" value="${item.text_color}" data-layout="${key}" data-field="text_color"><span>${item.text_color}</span></label>
+            </div>
+            <div class="grid tight">
+              ${selectControl(key, "font_family", "Font", fonts)}
+              ${selectControl(key, "text_align", "Text align", aligns)}
+              ${selectControl(key, "animation", "Animation", animations)}
+            </div>
+          `;
+        }
+
+        function layerSettingsHtml() {
+          return layerKeys.map(key => `
+            <div class="layer-setting-card" data-layer-card="${key}">
+              <h3>${layers[key].label}</h3>
+              <label class="hotkey-field">Hotkey <input maxlength="1" data-hotkey="${layers[key].id}" value="${layers[key].hotkey}"></label>
+              ${selectControl(key, "animation", "Animation", animations)}
+            </div>
+          `).join("");
+        }
+
+        function applyBox(key) {
+          const box = document.querySelector(`[data-layout-box="${key}"]`);
+          const item = layout[key];
+          if (!box) return;
+          box.style.left = `${(item.x / canvas.width) * 100}%`;
+          box.style.top = `${(item.y / canvas.height) * 100}%`;
+          box.style.width = `${(item.w / canvas.width) * 100}%`;
+          box.classList.toggle("selected", key === activeLayer);
+        }
+
+        function render() {
+          layerKeys.forEach(key => applyBox(key));
+          document.getElementById("selected-layer-note").textContent = `Selected: ${layout[activeLayer].label}. Use the sliders to move, resize, and style it.`;
+          document.getElementById("selected-layer-controls").innerHTML = selectedControlsHtml(activeLayer);
+          document.getElementById("layer-settings").innerHTML = layerSettingsHtml();
+          document.querySelectorAll("[data-layer-card]").forEach(card => {
+            card.classList.toggle("selected", card.dataset.layerCard === activeLayer);
+          });
+          const enabled = new Set(sanitizeLayerIds(graphics.enabled_layers || []));
+          document.querySelectorAll("[data-default-layer]").forEach(input => {
+            input.checked = enabled.has(input.value);
+          });
+          Kairix.attachButtonHelpers();
+        }
+
+        function updateControl(control) {
+          const key = control.dataset.layout;
+          const field = control.dataset.field;
+          if (!layout[key] || !field) return;
+          layout[key][field] = ["animation", "text_color", "font_family", "text_align"].includes(field)
+            ? control.value
+            : Number(control.value || 0);
+          layout[key] = clean(key, layout[key]);
+          activeLayer = key;
+          applyBox(key);
+          document.querySelectorAll(`[data-layout="${key}"][data-field="${field}"]`).forEach(peer => {
+            if (peer !== control && ["range", "number", "color"].includes(peer.type)) peer.value = control.value;
+          });
+          if (control.type === "color" && control.nextElementSibling?.tagName === "SPAN") control.nextElementSibling.textContent = control.value;
+          document.querySelectorAll("[data-layer-card]").forEach(card => card.classList.toggle("selected", card.dataset.layerCard === activeLayer));
+        }
+
+        function selectedLayerIds() {
+          return sanitizeLayerIds([...document.querySelectorAll("[data-default-layer]:checked")].map(input => input.value));
+        }
+
+        function sanitizeLayerIds(layerIds = []) {
+          const selected = [];
+          let boardLayer = null;
+          layerIds.forEach(id => {
+            if (boardLayerIds.has(id)) {
+              if (!boardLayer) {
+                boardLayer = id;
+                selected.push(id);
+              }
+              return;
+            }
+            selected.push(id);
+          });
+          return selected;
+        }
+
+        function readHotkeys() {
+          const keys = {};
+          document.querySelectorAll("[data-hotkey]").forEach(input => {
+            keys[input.dataset.hotkey] = input.value.trim().toUpperCase().slice(0, 1);
+          });
+          return keys;
+        }
+
+        function setHotkeys(keys = {}) {
+          layerKeys.forEach(key => {
+            const id = layers[key].id;
+            layers[key].hotkey = keys[id] || layers[key].hotkey;
+          });
+        }
+
+        function layoutConfig() {
+          const layoutEntries = {};
+          layerKeys.forEach(key => layoutEntries[key] = layout[key]);
+          return {
+            ...(graphics.layout_config || {}),
+            ...layoutEntries,
+            canvas,
+            display: {
+              show_run_type: document.getElementById("field-run-type").checked,
+              show_state: document.getElementById("field-state").checked,
+              show_class: document.getElementById("field-class").checked,
+              show_engine: document.getElementById("field-engine").checked,
+              show_total_score: document.getElementById("field-score").checked,
+            },
+            up_next_display: {
+              show_label: document.getElementById("up-field-label").checked,
+              show_car: document.getElementById("up-field-car").checked,
+              show_engine: document.getElementById("up-field-engine").checked,
+              show_class: document.getElementById("up-field-class").checked,
+              show_total_score: document.getElementById("up-field-score").checked,
+            },
+            judge_heat: {
+              mode: document.getElementById("heat-mode").value,
+              display_label: document.getElementById("heat-display-label").value || "Judge Heat",
+              score_max: Number(document.getElementById("heat-score-max").value || 10),
+              manual_value: Number(document.getElementById("heat-value").value || 0),
+            },
+            timer_style: {
+              warn_over_seconds: Number(document.getElementById("timer-warn").value || 0),
+              danger_over_seconds: Number(document.getElementById("timer-danger").value || 10),
+              shake_px: Number(document.getElementById("timer-shake").value || 3),
+            },
+            manual_style: {
+              size: "large",
+              large_font: 56,
+              small_font: 34,
+              dynamic_width: true,
+              min_width: 260,
+              max_width: 1100,
+            },
+            logo_style: {
+              url: document.getElementById("selected-logo").dataset.url || "",
+              opacity_with_layers: Number(document.getElementById("logo-opacity-active").value || 70),
+              opacity_alone: Number(document.getElementById("logo-opacity-idle").value || 25),
+            },
+            hotkeys: readHotkeys(),
+            follow_mode: document.getElementById("follow-mode").value,
+          };
+        }
+
+        function hydrateConfig(config = {}) {
+          document.getElementById("follow-mode").value = config.follow_mode || "direct";
+          document.getElementById("field-run-type").checked = Boolean(config.display?.show_run_type);
+          document.getElementById("field-state").checked = config.display?.show_state !== false;
+          document.getElementById("field-class").checked = Boolean(config.display?.show_class);
+          document.getElementById("field-engine").checked = config.display?.show_engine !== false;
+          document.getElementById("field-score").checked = Boolean(config.display?.show_total_score);
+          document.getElementById("up-field-label").checked = config.up_next_display?.show_label !== false;
+          document.getElementById("up-field-car").checked = config.up_next_display?.show_car !== false;
+          document.getElementById("up-field-engine").checked = Boolean(config.up_next_display?.show_engine);
+          document.getElementById("up-field-class").checked = Boolean(config.up_next_display?.show_class);
+          document.getElementById("up-field-score").checked = Boolean(config.up_next_display?.show_total_score);
+          document.getElementById("heat-mode").value = config.judge_heat?.mode || "live";
+          document.getElementById("heat-display-label").value = config.judge_heat?.display_label || "Judge Heat";
+          document.getElementById("heat-score-max").value = config.judge_heat?.score_max || 10;
+          document.getElementById("heat-value").value = config.judge_heat?.manual_value || 0;
+          document.getElementById("heat-value-text").textContent = config.judge_heat?.manual_value || 0;
+          document.getElementById("timer-warn").value = config.timer_style?.warn_over_seconds ?? 0;
+          document.getElementById("timer-danger").value = config.timer_style?.danger_over_seconds ?? 10;
+          document.getElementById("timer-shake").value = config.timer_style?.shake_px ?? 3;
+          document.getElementById("timer-shake-text").textContent = `${config.timer_style?.shake_px ?? 3}px`;
+          setSelectedLogo(config.logo_style?.url || "");
+          document.getElementById("logo-opacity-active").value = config.logo_style?.opacity_with_layers ?? 70;
+          document.getElementById("logo-opacity-active-text").textContent = `${config.logo_style?.opacity_with_layers ?? 70}%`;
+          document.getElementById("logo-opacity-idle").value = config.logo_style?.opacity_alone ?? 25;
+          document.getElementById("logo-opacity-idle-text").textContent = `${config.logo_style?.opacity_alone ?? 25}%`;
+          setHotkeys(config.hotkeys || {});
+        }
+
+        function setSelectedLogo(url) {
+          const selected = document.getElementById("selected-logo");
+          selected.dataset.url = url || "";
+          selected.textContent = url || "No logo selected";
+          renderLogoList();
+        }
+
+        function renderLogoList() {
+          const selectedUrl = document.getElementById("selected-logo")?.dataset.url || "";
+          const list = document.getElementById("logo-list");
+          if (!list) return;
+          if (!logoFiles.length) {
+            list.innerHTML = '<p class="muted">No uploaded logos yet.</p>';
+            return;
+          }
+          list.innerHTML = logoFiles.map(file => {
+            const selected = file.url === selectedUrl;
+            return `
+              <div class="logo-file-row ${selected ? "selected" : ""}">
+                <div class="logo-file-preview"><img src="${escapeAttr(file.url)}" alt=""></div>
+                <div>
+                  <strong>${escapeHtml(file.filename)}</strong>
+                  <span class="muted">${Math.round(file.size / 1024)} KB</span>
+                </div>
+                <div class="btn-row">
+              <button class="btn compact ${selected ? "active-state" : ""}" data-use-logo="${escapeAttr(file.url)}" data-help="Use this uploaded PNG as the OBS logo layer and save that selection.">Use Logo</button>
+              <button class="btn compact danger" data-delete-logo="${escapeAttr(file.filename)}" data-help="Delete this uploaded logo file from the server.">Delete Logo</button>
+                </div>
+              </div>
+            `;
+          }).join("");
+        }
+
+        async function loadLogos() {
+          if (!session?.session_id) return;
+          try {
+            const response = await Kairix.API.get(`/api/admin/graphics/logos?session_id=${session.session_id}`);
+            logoFiles = response.logos || [];
+            renderLogoList();
+          } catch (error) {
+            document.getElementById("logo-list").innerHTML = `<p class="danger-text">Logo list failed: ${error.message || error}</p>`;
+          }
+        }
+
+        async function load() {
+          try {
+            const auth = await fetch("/api/auth/session");
+            if (auth.ok) {
+              session = await auth.json();
+              document.getElementById("who").textContent = `${session.display_name} / ${session.role}`;
+            }
+          } catch (_) {}
+          try {
+            const state = await Kairix.getEventState({ preferCache: false });
+            graphics = state.graphics || graphics;
+            const cfg = graphics.layout_config || {};
+            layerKeys.forEach(key => layout[key] = clean(key, cfg[key]));
+            hydrateConfig(cfg);
+            render();
+            await loadLogos();
+            status("Settings loaded.");
+          } catch (error) {
+            render();
+            status(`Settings load failed: ${error.message || error}`, true);
+          }
+        }
+
+        async function persistSettings() {
+          const response = await Kairix.API.post("/api/admin/graphics-state", {
+            session_id: session?.session_id || null,
+            preset: "layers",
+            enabled_layers: selectedLayerIds(),
+            manual_message: graphics.manual_message || null,
+            fun_detail_mode: Boolean(graphics.fun_detail_mode),
+            show_debug_zones: false,
+            layout_config: layoutConfig(),
+          });
+          graphics = response.graphics || { ...graphics, enabled_layers: selectedLayerIds(), layout_config: layoutConfig() };
+        }
+
+        async function exportLayout(button) {
+          const payload = await Kairix.withButtonFeedback(button, () => Kairix.API.get(`/api/admin/graphics/layout-export?session_id=${session.session_id}`));
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = `kairix-graphics-layout-${Date.now()}.json`;
+          link.click();
+          status("Graphics layout downloaded.");
+        }
+
+        async function importLayout(button) {
+          const file = document.getElementById("layout-import-file").files[0];
+          if (!file) {
+            status("Choose a layout JSON file first.", true);
+            return;
+          }
+          const form = new FormData();
+          form.append("session_id", String(session.session_id));
+          form.append("file", file);
+          await Kairix.withButtonFeedback(button, async () => {
+            const response = await fetch("/api/admin/graphics/layout-import", { method: "POST", body: form });
+            if (!response.ok) throw new Error(await response.text());
+            return response.json();
+          });
+          await load();
+          status("Graphics layout imported.");
+        }
+
+        async function save(button) {
+          button.classList.add("busy");
+          status("Saving settings...");
+          try {
+            await persistSettings();
+            button.classList.add("success");
+            status("Settings saved.");
+            setTimeout(() => button.classList.remove("success"), 700);
+          } catch (error) {
+            status(`Save failed: ${error.message || error}`, true);
+          } finally {
+            button.classList.remove("busy");
+          }
+        }
+
+        document.addEventListener("input", event => {
+          const control = event.target.closest("[data-layout]");
+          if (control) updateControl(control);
+          if (event.target.id === "timer-shake") document.getElementById("timer-shake-text").textContent = `${event.target.value}px`;
+          if (event.target.id === "heat-value") document.getElementById("heat-value-text").textContent = event.target.value;
+          if (event.target.id === "logo-opacity-active") document.getElementById("logo-opacity-active-text").textContent = `${event.target.value}%`;
+          if (event.target.id === "logo-opacity-idle") document.getElementById("logo-opacity-idle-text").textContent = `${event.target.value}%`;
+        });
+        document.addEventListener("change", event => {
+          const control = event.target.closest("[data-layout]");
+          if (control) updateControl(control);
+          const defaultLayer = event.target.closest("[data-default-layer]");
+          if (defaultLayer?.checked && boardLayerIds.has(defaultLayer.value)) {
+            document.querySelectorAll("[data-default-layer]").forEach(input => {
+              if (input !== defaultLayer && boardLayerIds.has(input.value)) input.checked = false;
+            });
+          }
+        });
+        document.addEventListener("click", event => {
+          if (event.target.closest("input, select, textarea, option")) return;
+          const box = event.target.closest("[data-layout-box]");
+          if (box) {
+            activeLayer = box.dataset.layoutBox;
+            render();
+            return;
+          }
+          const card = event.target.closest("[data-layer-card]");
+          if (card) {
+            activeLayer = card.dataset.layerCard;
+            render();
+          }
+        });
+        document.getElementById("reset-layout").addEventListener("click", event => {
+          layout = JSON.parse(JSON.stringify(layers));
+          render();
+          Kairix.withButtonFeedback(event.currentTarget, async () => true);
+          status("Layout reset. Press Save Settings to keep it.");
+        });
+        document.getElementById("save").addEventListener("click", event => save(event.currentTarget));
+        document.getElementById("save-top").addEventListener("click", event => save(event.currentTarget));
+        document.getElementById("export-layout").addEventListener("click", event => exportLayout(event.currentTarget));
+        document.getElementById("import-layout").addEventListener("click", event => importLayout(event.currentTarget));
+        document.getElementById("upload-logo").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, async () => {
+          const file = document.getElementById("logo-upload").files[0];
+          if (!file) {
+            status("Choose a PNG logo first.", true);
+            return false;
+          }
+          const body = new FormData();
+          body.append("session_id", session?.session_id || "");
+          body.append("file", file);
+          const response = await fetch("/api/admin/graphics/logos", { method: "POST", body });
+          if (!response.ok) throw new Error(await response.text());
+          const payload = await response.json();
+          setSelectedLogo(payload.logo.url);
+          document.getElementById("logo-upload").value = "";
+          await loadLogos();
+          await persistSettings();
+          status("Logo uploaded and selected.");
+          return true;
+        }));
+        document.getElementById("logo-list").addEventListener("click", event => {
+          const use = event.target.closest("[data-use-logo]");
+          if (use) {
+            Kairix.withButtonFeedback(use, async () => {
+              setSelectedLogo(use.dataset.useLogo);
+              await persistSettings();
+              status("Logo selected.");
+              return true;
+            });
+            return;
+          }
+          const del = event.target.closest("[data-delete-logo]");
+          if (del) {
+            Kairix.withButtonFeedback(del, async () => {
+              if (!confirm(`Delete ${del.dataset.deleteLogo}?`)) return false;
+              const response = await fetch(`/api/admin/graphics/logos/${encodeURIComponent(del.dataset.deleteLogo)}?session_id=${session.session_id}`, { method: "DELETE" });
+              if (!response.ok) throw new Error(await response.text());
+              if (document.getElementById("selected-logo").dataset.url.endsWith(`/${del.dataset.deleteLogo}`)) setSelectedLogo("");
+              await loadLogos();
+              status("Logo deleted.");
+              return true;
+            });
+          }
+        });
+
+        window.KairixGfxSettings = { load, save, render };
+        render();
+        load();
+      })();
+    </script>
+  </body>
+</html>

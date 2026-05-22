@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Judge Recovery</title>
+    <link rel="icon" href="/static/kairix-judging-system-logo.png">
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <div class="topline">
+        <div class="brand-block">
+          <div class="brand-row">
+            <img class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
+            <div class="brand">Judge Recovery</div>
+          </div>
+          <div class="muted">Local score records stored on this device</div>
+        </div>
+        <a class="btn" href="/" data-help="Return to the landing page and PIN login.">Home</a>
+      </div>
+      <section class="card">
+        <div class="btn-row">
+          <button id="copy" class="btn primary" data-help="Copy all local recovery records from this device to the clipboard.">Copy Recovery Data</button>
+          <button id="download" class="btn" data-help="Download this device's local recovery records as a JSON backup file.">Download Recovery Backup</button>
+        </div>
+        <p id="recovery-status" class="muted">Recovery data is generated from this browser's local storage.</p>
+        <textarea id="backup" class="section-gap-md tall-textarea"></textarea>
+      </section>
+    </main>
+    <script src="/static/js/common.js"></script>
+    <script>
+      function buildBackup() {
+        const records = Kairix.safeJsonParse(localStorage.getItem("kairix_score_records"), []);
+        const payload = {
+          generated_at: new Date().toISOString(),
+          device_id: Kairix.deviceId(),
+          session: Kairix.session(),
+          records,
+        };
+        return JSON.stringify(payload, null, 2);
+      }
+      function refresh() {
+        document.getElementById("backup").value = buildBackup();
+      }
+      document.getElementById("copy").addEventListener("click", event => {
+        Kairix.withButtonFeedback(event.currentTarget, async () => {
+          await navigator.clipboard.writeText(document.getElementById("backup").value);
+          document.getElementById("recovery-status").textContent = "Recovery data copied to clipboard.";
+        });
+      });
+      document.getElementById("download").addEventListener("click", event => {
+        Kairix.withButtonFeedback(event.currentTarget, async () => {
+          const blob = new Blob([document.getElementById("backup").value], { type: "application/json" });
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          link.download = `kairix-recovery-${Date.now()}.json`;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+          document.getElementById("recovery-status").textContent = "Recovery backup download started.";
+        });
+      });
+      refresh();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kairix Judgenburn</title>
+    <link rel="icon" href="/static/kairix-judging-system-logo.png">
+    <link rel="stylesheet" href="/static/css/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <div class="topline">
+        <div class="brand-block">
+          <div class="brand-row">
+            <img class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
+            <div class="brand">Kairix Judgenburn</div>
+          </div>
+          <div class="muted">Live event judging, queue, delay, and graphics control</div>
+          <div id="event-line" class="muted brand-subline">Checking event status</div>
+        </div>
+        <span id="connection" class="status-pill">Checking</span>
+      </div>
+
+      <section class="grid">
+        <a class="card" href="/queue" title="Open the public-safe competitor queue display.">
+          <h2>Competitor Queue</h2>
+          <p class="muted">Current competitor, next up, and delay information.</p>
+        </a>
+        <a class="card" href="/obs-overlay" title="Open the transparent OBS overlay page.">
+          <h2>OBS Overlay</h2>
+          <p class="muted">Single transparent browser overlay for stream graphics.</p>
+        </a>
+      </section>
+
+      <section class="card section-gap-lg">
+        <h2>Login with PIN</h2>
+        <p class="muted">Enter the PIN for your role and the system will open the correct control page.</p>
+        <div class="grid">
+          <label>
+            PIN
+            <input id="pin" inputmode="numeric" autocomplete="one-time-code" placeholder="Judge, graphics, admin, high admin, or owner PIN">
+          </label>
+          <div class="align-end">
+            <button id="login" class="btn primary" data-help="Check the entered PIN and open the correct page for that role.">Login</button>
+          </div>
+        </div>
+        <p class="muted">Use the event-issued PIN for your role. Judges, graphics, admin, high admin, and owner each have their own access level.</p>
+        <p id="login-error" class="muted"></p>
+      </section>
+
+      <section id="landing-notice-card" class="card landing-notice" style="display:none;">
+        <h2>Event Message</h2>
+        <p id="landing-notice-text" class="muted"></p>
+      </section>
+    </main>
+    <script src="/static/js/common.js"></script>
+    <script>
+      function setConnectionState(text, className = "") {
+        const pill = document.getElementById("connection");
+        pill.textContent = text;
+        pill.className = `status-pill ${className}`.trim();
+      }
+
+      async function refresh() {
+        try {
+          const state = await Kairix.getEventState();
+          const mode = state.client_connection?.mode === "cloud" ? "cloud fallback" : "local";
+          setConnectionState(`System online (${mode})`, "good-pill");
+          document.getElementById("event-line").textContent = [state.event.name, state.event.venue, state.event.event_date]
+            .filter(Boolean)
+            .join(" / ");
+          const notice = String(state.settings?.landing_notice || "").trim();
+          document.getElementById("landing-notice-card").style.display = notice ? "block" : "none";
+          document.getElementById("landing-notice-text").textContent = notice;
+        } catch {
+          setConnectionState("Offline", "danger-pill");
+          document.getElementById("event-line").textContent = "Unable to reach the live event feed right now.";
+          document.getElementById("landing-notice-card").style.display = "none";
+        }
+      }
+      async function doLogin() {
+        const pin = document.getElementById("pin").value.trim();
+        document.getElementById("login-error").textContent = "Checking PIN...";
+        try {
+          const result = await Kairix.API.post("/api/auth/pin", { pin, device_id: Kairix.deviceId() });
+          Kairix.setSession(result);
+          window.location.href = result.redirect;
+        } catch (error) {
+          document.getElementById("login-error").textContent = `Login failed: ${error.message}`;
+        }
+      }
+      document.getElementById("login").addEventListener("click", doLogin);
+      document.getElementById("pin").addEventListener("keydown", event => {
+        if (event.key === "Enter") doLogin();
+      });
+      refresh();
+      Kairix.subscribeLiveState(refresh);
+    </script>
+  </body>
+</html>
