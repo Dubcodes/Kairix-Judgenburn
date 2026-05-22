@@ -75,8 +75,9 @@ git commit -m "Initial Kairix Judgenburn system"
 After it is pushed to GitHub or another git host, a new device can use:
 
 ```bash
-git clone <repo-url>
-cd kairix-judgenburn-system
+git clone https://github.com/Dubcodes/Kairix-Judgenburn.git
+cd Kairix-Judgenburn
+cp .env.example .env
 sh ./run.sh
 ```
 
