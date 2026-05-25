@@ -119,11 +119,9 @@
             <label class="compact-field section-gap-sm">Approx minutes
               <input id="control-delay-minutes" type="number" min="0" value="5">
             </label>
+            <div id="delay-preset-buttons" class="btn-row section-gap-sm"></div>
             <div class="btn-row section-gap-sm">
-              <button class="btn" data-quick-delay="Lunch break" data-minutes="30" data-help="Create an official lunch break delay using the minutes field or the default 30 minutes.">Lunch Break</button>
-              <button class="btn" data-quick-delay="Track cleanup" data-minutes="5" data-help="Create an official track cleanup delay using the minutes field or the default 5 minutes.">Track Cleanup</button>
-              <button class="btn" data-quick-delay="Breakdown recovery" data-minutes="10" data-help="Create an official breakdown recovery delay using the minutes field or the default 10 minutes.">Breakdown Delay</button>
-              <button class="btn danger" data-control-delay="custom" data-help="Create or replace an official delay using your own message and duration.">Custom Delay</button>
+              <button class="btn" data-control-delay="custom" data-help="Create or replace an official delay using your own message and duration.">Custom Delay</button>
               <button class="btn" data-control-delay-clear data-help="Clear the official delay from admin, judge, queue, and graphics displays.">Clear Delay</button>
             </div>
           </div>
@@ -202,10 +200,10 @@
       <section id="panel-competitors" class="panel">
         <div class="card">
           <h2>Competitor Order</h2>
-          <p class="muted">Drag rows into order, or type position numbers and save. This controls the queue used by admin, judges, queue display, and graphics.</p>
+          <p class="muted">Drag rows into order and save. Set Next Competitor moves a run directly behind the current competitor without changing who judges are scoring right now.</p>
+          <p class="notice">A small orange dot means this competitor already has scoring activity in this heat. Hover it before re-running them, because a judge who already submitted that heat/run will see their score as already submitted.</p>
           <div class="btn-row stack-gap-sm">
             <button id="save-order" class="btn primary" data-help="Save the current competitor order so queue, judging, and graphics all use the same order.">Save Order</button>
-            <button id="renumber-order" class="btn" data-help="Fill the visible order fields sequentially from 1 downward before saving.">Renumber Order</button>
           </div>
           <div id="competitor-order"></div>
         </div>
@@ -309,6 +307,11 @@
               <input id="settings-graphics-total-scores" type="checkbox">
               Allow competitor total scores on graphics overlays
             </label>
+            <div class="notice owner-only">
+              <strong>Delay control presets</strong>
+              <p class="muted">Owner only. These are the quick delay buttons on Run Control. Keep them short so operators can read the active delay at a glance.</p>
+              <div id="settings-delay-presets" class="settings-stack"></div>
+            </div>
             <label>Landing-page notice
               <textarea id="settings-landing-notice" rows="4" placeholder="Optional notice shown in the message box at the bottom of the home page. Leave blank to hide it."></textarea>
             </label>
@@ -537,6 +540,11 @@
         pendingHeat: null,
         heatArmedUntil: 0,
         latestDelay: null,
+        delayPresets: [
+          { key: "lunch_break", label: "Lunch Break", message: "Lunch break", minutes: 30 },
+          { key: "track_cleanup", label: "Track Cleanup", message: "Track cleanup", minutes: 5 },
+          { key: "breakdown_delay", label: "Breakdown Delay", message: "Breakdown recovery", minutes: 10 },
+        ],
         openScoreDetails: new Set(),
         openResultDetails: new Set(),
         openJudgeResultDetails: new Set(),
@@ -558,6 +566,7 @@
         ["checkbox", "Checkbox"],
         ["toggle", "Toggle"],
       ];
+      const DEFAULT_DELAY_PRESETS = adminState.delayPresets.map(item => ({ ...item }));
       Kairix.validateSession(adminState.session, ["admin", "high_admin", "owner"]).catch(() => {});
       function isInvalidSessionError(value) {
         const text = String(value?.message || value || "");
@@ -584,6 +593,79 @@
         return CRITERION_TYPES.map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`).join("");
       }
 
+      function normalizeDelayPresets(presets = []) {
+        const source = Array.isArray(presets) && presets.length ? presets : DEFAULT_DELAY_PRESETS;
+        return source.slice(0, 3).map((item, index) => {
+          const fallback = DEFAULT_DELAY_PRESETS[index] || DEFAULT_DELAY_PRESETS[0];
+          const label = String(item.label || fallback.label).trim() || fallback.label;
+          const message = String(item.message || label).trim() || label;
+          const minutes = Math.max(0, Math.min(240, Number(item.minutes ?? item.estimated_minutes ?? fallback.minutes) || 0));
+          const key = String(item.key || label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || `preset_${index + 1}`);
+          return { key, label, message, minutes };
+        });
+      }
+
+      function activeDelayMatchesPreset(delay, preset) {
+        if (!delay || !preset) return false;
+        return String(delay.message || "").trim().toLowerCase() === String(preset.message || "").trim().toLowerCase();
+      }
+
+      function renderDelayPresetButtons() {
+        const target = document.getElementById("delay-preset-buttons");
+        if (!target) return;
+        target.innerHTML = adminState.delayPresets.map(preset => `
+          <button class="btn" data-quick-delay="${escapeHtml(preset.message)}" data-delay-preset-key="${escapeHtml(preset.key)}" data-minutes="${Number(preset.minutes) || 0}" data-help="Create an official ${escapeHtml(preset.label)} delay for ${Number(preset.minutes) || 0} minutes. Owner can change these presets in Settings.">${escapeHtml(preset.label)}</button>
+        `).join("");
+        updateDelayButtonStates();
+      }
+
+      function updateDelayButtonStates() {
+        const activeDelay = adminState.latestDelay;
+        let matchedPreset = false;
+        document.querySelectorAll("[data-delay-preset-key]").forEach(button => {
+          const preset = adminState.delayPresets.find(item => item.key === button.dataset.delayPresetKey);
+          const active = activeDelayMatchesPreset(activeDelay, preset);
+          matchedPreset = matchedPreset || active;
+          button.classList.toggle("active-state", active);
+          button.classList.toggle("warn", active);
+        });
+        const custom = document.querySelector("[data-control-delay='custom']");
+        if (custom) {
+          custom.classList.toggle("active-state", Boolean(activeDelay && !matchedPreset));
+          custom.classList.toggle("warn", Boolean(activeDelay && !matchedPreset));
+        }
+        const clear = document.querySelector("[data-control-delay-clear]");
+        if (clear) clear.classList.toggle("attention", Boolean(activeDelay));
+      }
+
+      function renderDelayPresetSettings() {
+        const target = document.getElementById("settings-delay-presets");
+        if (!target || adminState.session.role !== "owner") return;
+        target.innerHTML = adminState.delayPresets.map((preset, index) => `
+          <div class="delay-preset-setting" data-delay-preset-index="${index}">
+            <label>Button label <input data-delay-preset-field="label" value="${escapeHtml(preset.label)}"></label>
+            <label>Delay message <input data-delay-preset-field="message" value="${escapeHtml(preset.message)}"></label>
+            <label>Minutes <input data-delay-preset-field="minutes" type="number" min="0" max="240" value="${Number(preset.minutes) || 0}"></label>
+          </div>
+        `).join("");
+      }
+
+      function collectDelayPresets() {
+        if (adminState.session.role !== "owner") return adminState.delayPresets;
+        const rows = [...document.querySelectorAll("[data-delay-preset-index]")];
+        if (!rows.length) return adminState.delayPresets;
+        return normalizeDelayPresets(rows.map((row, index) => {
+          const field = name => row.querySelector(`[data-delay-preset-field="${name}"]`);
+          const fallback = adminState.delayPresets[index] || DEFAULT_DELAY_PRESETS[index] || DEFAULT_DELAY_PRESETS[0];
+          return {
+            key: fallback.key,
+            label: field("label")?.value || fallback.label,
+            message: field("message")?.value || field("label")?.value || fallback.message,
+            minutes: Number(field("minutes")?.value ?? fallback.minutes),
+          };
+        }));
+      }
+
       document.getElementById("who").textContent = `${adminState.session.display_name} / ${roleDisplay(adminState.session.role)}`;
       if (adminState.session.role !== "owner") {
         document.querySelectorAll(".owner-only").forEach(item => item.style.display = "none");
@@ -596,6 +678,7 @@
         const visibleButtons = [...cluster.querySelectorAll(".tab")].filter(button => button.style.display !== "none");
         if (!visibleButtons.length) cluster.style.display = "none";
       });
+      renderDelayPresetButtons();
 
       function activateTab(tabName) {
         document.querySelectorAll(".tab").forEach(item => item.classList.toggle("active", item.dataset.tab === tabName));
@@ -765,6 +848,7 @@
         const subtitle = options.subtitle || `${entry.source_type || "judge_submission"} · ${entry.device_id || "no device"}`;
         const classes = ["score-entry-card", options.compact ? "compact-score-card" : ""].filter(Boolean).join(" ");
         const canOverride = canAdjustScores() && entry.status === "submitted";
+        const canVoid = adminState.session.role === "owner" && entry.active_for_results && ["draft", "submitted"].includes(entry.status);
         const adjustmentKey = `${key}-adjustment`;
         return `
           <details class="${classes}" data-score-detail="${escapeHtml(key)}" ${open}>
@@ -780,11 +864,12 @@
               </div>
             </summary>
             ${scoreItemTable(entry.items || [])}
-            ${canOverride ? `
+            ${(canOverride || canVoid) ? `
               <div class="btn-row section-gap-sm">
-                ${scoreAdjustmentButton(entry, adjustmentKey)}
+                ${canOverride ? scoreAdjustmentButton(entry, adjustmentKey) : ""}
+                ${canVoid ? `<button class="btn compact danger" data-void-score="${entry.id}" data-help="Owner only: delete this judge scoring from live results and require an audit reason. The score row is voided, not physically erased.">Delete Judge Scoring</button>` : ""}
               </div>
-              ${scoreAdjustmentPanel(entry, adjustmentKey)}
+              ${canOverride ? scoreAdjustmentPanel(entry, adjustmentKey) : ""}
             ` : ""}
           </details>
         `;
@@ -1090,6 +1175,8 @@
           button.classList.toggle("active-state", state.current_run?.run_type === button.dataset.currentRunType);
           button.disabled = !state.current_run;
         });
+        adminState.delayPresets = normalizeDelayPresets(state.settings?.delay_presets);
+        renderDelayPresetButtons();
         adminState.latestDelay = state.delay ? { ...state.delay, fetched_at_ms: Date.now() } : null;
         const delayText = state.delay ? `${state.delay.message} - ${state.delay.countdown_text || ""}` : "No active delay";
         const currentSummary = state.current_run ? Kairix.formatRun(state.current_run) : "No current run";
@@ -1100,6 +1187,7 @@
         document.getElementById("summary-heat").textContent = `Heat ${state.current_heat || 1}`;
         renderRunHeatControl(state);
         renderAdminDelayReadout();
+        updateDelayButtonStates();
         updateTimerFromState(state.timer);
 
         const queue = await Kairix.getQueue();
@@ -1121,7 +1209,7 @@
               </div>
             </div>
             <div class="btn-row">
-              <button class="btn primary ${isCurrent ? "active-state" : ""}" data-current="${run.id}" data-help="Make this run the official current competitor for judges, queue displays, and event control.">Set Current</button>
+              <button class="btn primary ${isUpNext ? "active-state" : ""}" ${isCurrent ? "disabled" : `data-set-next="${run.id}"`} data-help="${isCurrent ? "This is already the official current competitor." : "Move this run directly behind the current competitor without changing who judges are scoring right now."}">${isCurrent ? "Current" : "Set Next Competitor"}</button>
             </div>
           </div>
         `;
@@ -1231,6 +1319,12 @@
         }
         if (document.activeElement !== document.getElementById("settings-landing-notice")) {
           document.getElementById("settings-landing-notice").value = config.landing_notice || "";
+        }
+        const presetEditing = document.activeElement?.closest?.("#settings-delay-presets");
+        if (!presetEditing) {
+          adminState.delayPresets = normalizeDelayPresets(config.delay_presets);
+          renderDelayPresetButtons();
+          renderDelayPresetSettings();
         }
         if (!document.getElementById("lifecycle-event-name").value) {
           document.getElementById("lifecycle-event-name").value = event.name || "";
@@ -1398,11 +1492,14 @@
         document.getElementById("competitor-order").innerHTML = data.runs.map(run => {
           const isCurrent = currentId === run.id;
           const isUpNext = upNextId === run.id;
+          const heatScoreCount = Number(run.heat_score_count || 0);
+          const scoreWarning = heatScoreCount
+            ? `<span class="score-warning-dot" title="This competitor already has ${heatScoreCount} draft/submitted score entr${heatScoreCount === 1 ? "y" : "ies"} in Heat ${run.heat_number || 1}. If they are running again in this same heat, create or edit the correct run before judges score it."></span>`
+            : "";
           return `
           <div class="card run-order-row ${isCurrent ? "current-run-highlight" : ""} ${isUpNext ? "featured-run-highlight" : ""}" draggable="true" data-run-id="${run.id}">
-            <input class="order-input" type="number" min="1" value="${run.queue_position}" data-run-id="${run.id}">
             <div>
-              <strong>#${run.competitor.entry_number} ${run.competitor.driver_name}</strong>
+              <strong>#${run.competitor.entry_number} ${run.competitor.driver_name} ${scoreWarning}</strong>
               <div class="muted">${run.vehicle.name || "Vehicle TBC"} ${run.vehicle.engine || ""} / ${run.run_type} / ${run.state || "not assigned"}</div>
               <div class="mini-badges">
                 ${isCurrent ? '<em>CURRENT</em>' : ""}
@@ -1410,7 +1507,7 @@
               </div>
             </div>
             <div class="btn-row">
-              <button class="btn ${isCurrent ? "active-state" : ""}" data-current="${run.id}" data-help="Make this run the official current competitor for judges, queue displays, and event control.">Set Current</button>
+              <button class="btn ${isUpNext ? "active-state" : ""}" ${isCurrent ? "disabled" : `data-set-next="${run.id}"`} data-help="${isCurrent ? "This is already the official current competitor." : "Move this run directly behind the current competitor without changing who judges are scoring right now."}">${isCurrent ? "Current" : "Set Next Competitor"}</button>
               <button class="btn" data-edit-run="${run.id}" data-help="Open or close inline editing for this competitor, vehicle, run type, state, heat, and order.">Edit</button>
             </div>
             <div class="run-edit" id="edit-run-${run.id}" style="display:${adminState.editingRuns.has(String(run.id)) ? "block" : "none"}; grid-column: 1 / -1;">
@@ -1554,6 +1651,19 @@
           panel?.classList.toggle("open", opening);
           return;
         }
+        const voidScore = event.target.closest("[data-void-score]");
+        if (voidScore) {
+          const entry = adminState.scoreEntryCache.get(String(voidScore.dataset.voidScore));
+          const label = entry ? `${entry.competitor || "this competitor"} / ${entry.judge_name || "judge"}` : "this score";
+          const reason = prompt(`Reason for deleting judge scoring for ${label}`);
+          if (!reason || !reason.trim()) return;
+          await Kairix.withButtonFeedback(voidScore, () => Kairix.API.post(`/api/admin/score-entries/${voidScore.dataset.voidScore}/void`, {
+            session_id: adminState.session.session_id,
+            reason: reason.trim(),
+          }));
+          await refresh({ forceAdjustmentRefresh: true });
+          return;
+        }
         const adjustmentCancel = event.target.closest("[data-cancel-adjustment]");
         if (adjustmentCancel) {
           const key = adjustmentCancel.dataset.cancelAdjustment;
@@ -1590,10 +1700,11 @@
           if (created) refresh({ forceAdjustmentRefresh: true });
           return;
         }
-        const current = event.target.closest("[data-current]");
-        if (current) {
-          await fetch(`/api/admin/current-run/${current.dataset.current}?session_id=${adminState.session.session_id}`, { method: "POST" });
+        const setNext = event.target.closest("[data-set-next]");
+        if (setNext) {
+          await Kairix.withButtonFeedback(setNext, () => fetch(`/api/admin/next-run/${setNext.dataset.setNext}?session_id=${adminState.session.session_id}`, { method: "POST" }));
           refresh();
+          await refreshCompetitors(true);
         }
         const stateButton = event.target.closest("[data-state]");
         if (stateButton && adminState.currentRun) {
@@ -1864,19 +1975,10 @@
         renumberInputs();
         markOrderDirty();
       });
-      document.getElementById("competitor-order").addEventListener("input", event => {
-        if (event.target.closest(".order-input")) markOrderDirty();
-      });
-
-      function renumberInputs() {
-        [...document.querySelectorAll("#competitor-order .order-input")].forEach((input, idx) => input.value = idx + 1);
-        markOrderDirty();
-      }
-
       async function saveOrder(button) {
-        const items = [...document.querySelectorAll("#competitor-order .order-input")].map(input => ({
-          run_id: Number(input.dataset.runId),
-          queue_position: Number(input.value),
+        const items = [...document.querySelectorAll("#competitor-order .run-order-row")].map((row, index) => ({
+          run_id: Number(row.dataset.runId),
+          queue_position: index + 1,
         }));
         await Kairix.withButtonFeedback(button, () => Kairix.API.post("/api/admin/run-order", {
           session_id: adminState.session.session_id,
@@ -1888,11 +1990,6 @@
         refresh();
       }
 
-      document.getElementById("renumber-order").addEventListener("click", event => {
-        renumberInputs();
-        event.currentTarget.classList.add("pressed");
-        setTimeout(() => event.currentTarget.classList.remove("pressed"), 180);
-      });
       document.getElementById("save-order").addEventListener("click", event => saveOrder(event.currentTarget));
       document.getElementById("timer-value").addEventListener("blur", event => {
         event.target.value = formatSeconds(parseTimerValue(event.target.value));
@@ -1993,8 +2090,12 @@
           show_public_total_scores: document.getElementById("settings-public-total-scores").checked,
           show_graphics_total_scores: document.getElementById("settings-graphics-total-scores").checked,
           judge_likeness_enabled: document.getElementById("settings-likeness").checked,
+          delay_presets: collectDelayPresets(),
           landing_notice: document.getElementById("settings-landing-notice").value || null,
         }));
+        adminState.delayPresets = collectDelayPresets();
+        renderDelayPresetButtons();
+        renderDelayPresetSettings();
         setSettingsStatus("Settings saved.");
         await refresh();
       });

@@ -51,6 +51,7 @@ def ensure_schema_upgrades() -> None:
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS connectivity_config JSON DEFAULT '{}'"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_public_total_scores BOOLEAN DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_graphics_total_scores BOOLEAN DEFAULT TRUE"))
+        conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS delay_presets JSON DEFAULT '[]'"))
 
 
 @app.on_event("startup")

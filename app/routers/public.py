@@ -439,6 +439,7 @@ def event_state_payload(db: Session) -> dict:
             "show_graphics_total_scores": settings.show_graphics_total_scores if settings else False,
             "judge_likeness_enabled": settings.judge_likeness_enabled if settings else True,
             "landing_notice": settings.landing_notice if settings else None,
+            "delay_presets": settings.delay_presets if settings and isinstance(settings.delay_presets, list) else [],
             "connectivity": connectivity_payload(settings),
         },
         "current_run": run_payload(current_run, scoreboard),

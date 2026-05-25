@@ -1886,9 +1886,32 @@ label {
 
 .run-order-row {
   display: grid;
-  grid-template-columns: 72px 1fr auto;
+  grid-template-columns: 1fr auto;
   gap: 10px;
   align-items: center;
+}
+
+.score-warning-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--warn);
+  box-shadow: 0 0 0 3px rgba(161, 92, 0, .18);
+  vertical-align: middle;
+}
+
+.delay-preset-setting {
+  display: grid;
+  grid-template-columns: minmax(130px, .7fr) minmax(180px, 1fr) minmax(90px, .35fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.judge-helper-note {
+  margin-bottom: 0;
+  font-size: var(--text-xs);
 }
 
 .list-row {
@@ -2496,7 +2519,8 @@ label {
   .public-split-grid,
   .public-status-grid,
   .public-next-grid,
-  .queue-status-grid {
+  .queue-status-grid,
+  .delay-preset-setting {
     grid-template-columns: 1fr;
   }
 

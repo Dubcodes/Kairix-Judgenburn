@@ -37,6 +37,11 @@ class ScoreOverrideInput(BaseModel):
     items: list[ScoreItemInput]
 
 
+class ScoreVoidInput(BaseModel):
+    session_id: int
+    reason: str
+
+
 class RecoveryImportInput(BaseModel):
     session_id: int
     source_device_id: str | None = None
@@ -184,6 +189,7 @@ class EventSettingsInput(BaseModel):
     show_public_total_scores: bool = False
     show_graphics_total_scores: bool = True
     judge_likeness_enabled: bool = True
+    delay_presets: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ConnectivitySettingsInput(BaseModel):

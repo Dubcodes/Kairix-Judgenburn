@@ -43,8 +43,11 @@ def save_score(payload: ScoreDraftRequest, db: Session = Depends(get_db)) -> dic
 
     submitted_entry = db.scalar(
         select(ScoreEntry)
+        .join(Run, Run.id == ScoreEntry.run_id)
         .where(
-            ScoreEntry.run_id == payload.run_id,
+            ScoreEntry.event_id == session.event_id,
+            Run.competitor_id == run.competitor_id,
+            Run.heat_number == run.heat_number,
             ScoreEntry.judge_id == session.judge_id,
             ScoreEntry.source_type == "judge_submission",
             ScoreEntry.status == "submitted",
@@ -58,10 +61,12 @@ def save_score(payload: ScoreDraftRequest, db: Session = Depends(get_db)) -> dic
                 "score_entry_id": submitted_entry.id,
                 "status": submitted_entry.status,
                 "already_submitted": True,
+                "already_submitted_scope": "competitor_heat",
+                "submitted_run_id": submitted_entry.run_id,
                 "missing_criteria": [],
                 "total": float(submitted_entry.total or 0),
             }
-        raise HTTPException(status_code=409, detail="Score already submitted for this run")
+        raise HTTPException(status_code=409, detail="Score already submitted for this competitor in this heat")
 
     entry = db.scalar(
         select(ScoreEntry).where(
@@ -141,8 +146,9 @@ def my_submissions(session_id: int, db: Session = Depends(get_db)) -> dict:
     if session.role != "judge" or not session.judge_id:
         raise HTTPException(status_code=403, detail="Judge session required")
 
-    entries = db.scalars(
-        select(ScoreEntry)
+    rows = db.execute(
+        select(ScoreEntry, Run)
+        .join(Run, Run.id == ScoreEntry.run_id)
         .where(
             ScoreEntry.event_id == session.event_id,
             ScoreEntry.judge_id == session.judge_id,
@@ -151,16 +157,22 @@ def my_submissions(session_id: int, db: Session = Depends(get_db)) -> dict:
         )
         .order_by(ScoreEntry.submitted_at.desc())
     ).all()
+    entries = [entry for entry, _ in rows]
     return {
         "submitted_run_ids": [entry.run_id for entry in entries],
+        "submitted_competitor_heat_keys": sorted(
+            {f"{entry.competitor_id}:{run.heat_number or 1}" for entry, run in rows}
+        ),
         "submissions": [
             {
                 "run_id": entry.run_id,
+                "competitor_id": entry.competitor_id,
+                "heat_number": run.heat_number,
                 "score_entry_id": entry.id,
                 "total": float(entry.total or 0),
                 "submitted_at": entry.submitted_at.isoformat() if entry.submitted_at else None,
             }
-            for entry in entries
+            for entry, run in rows
         ],
     }
 

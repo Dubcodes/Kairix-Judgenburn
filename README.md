@@ -2,6 +2,12 @@
 
 Live-event judging, run control, scoring, queue display, public results, and OBS graphics for burnout competitions.
 
+## Requirements
+
+- Git
+- Docker Desktop on Windows/macOS, or Docker Engine with Compose on Linux
+- A modern browser for admin, judge, public display, and OBS pages
+
 ## Quick Start
 
 Clone the project onto the event computer, then run one command from the project folder.
@@ -10,6 +16,12 @@ Windows PowerShell:
 
 ```powershell
 .\run.ps1
+```
+
+If Windows blocks script execution, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run.ps1
 ```
 
 Linux, macOS, or a server shell:
@@ -62,26 +74,25 @@ POSTGRES_PASSWORD=change_me_before_event_day
 
 Keep `.env`, backups, database volumes, and uploaded media out of git. The included `.gitignore` and `.dockerignore` already exclude those local files.
 
-## Git Setup
+## Install On A New Device
 
-This folder is ready to become a git repository:
-
-```bash
-git init
-git add .
-git commit -m "Initial Kairix Judgenburn system"
-```
-
-After it is pushed to GitHub or another git host, a new device can use:
+Clone the shared GitHub repository, enter the project folder, then start it.
 
 ```bash
 git clone https://github.com/Dubcodes/Kairix-Judgenburn.git
 cd Kairix-Judgenburn
-cp .env.example .env
 sh ./run.sh
 ```
 
-On Windows, use `.\run.ps1` instead of `sh ./run.sh`.
+On Windows:
+
+```powershell
+git clone https://github.com/Dubcodes/Kairix-Judgenburn.git
+cd Kairix-Judgenburn
+.\run.ps1
+```
+
+The run scripts create `.env` from `.env.example` if it does not exist.
 
 ## Seed PINs
 
@@ -97,6 +108,15 @@ On Windows, use `.\run.ps1` instead of `sh ./run.sh`.
 Public pages use `/api/public/snapshot`, a cached read-only snapshot that strips internal IDs, judge data, device data, plates, engine details, sponsor fields, admin graphics config, and score breakdowns. Public score totals are only included when the owner/high-admin setting allows them.
 
 Internal admin, judging, scoring, and OBS pages still use the richer live event state where they need it.
+
+## Event-Day Controls
+
+- **Set Next Competitor** moves a competitor directly behind the current run without changing who judges are scoring.
+- Drag competitors in the Competitors page and use **Save Order** to update the queue.
+- Delay buttons on Run Control light up when their matching delay is active.
+- Owner accounts can edit the quick delay presets in Settings.
+- Owner accounts can void/delete a judge score from the scoring monitor with a required reason. The row is kept for audit, marked voided, and removed from live results.
+- If a judge has already submitted for the same competitor in the same heat, the judge page treats it as already submitted successfully instead of creating a duplicate score.
 
 ## Operating Notes
 

@@ -51,6 +51,7 @@ class EventSettings(TimestampMixin, Base):
     max_judges: Mapped[int] = mapped_column(Integer, default=20)
     landing_notice: Mapped[str | None] = mapped_column(Text)
     connectivity_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    delay_presets: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
 
     event: Mapped[Event] = relationship(back_populates="settings")
 

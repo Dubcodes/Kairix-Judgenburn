@@ -53,6 +53,7 @@ from app.schemas import (
     RecoveryImportInput,
     RunOrderInput,
     ScoreOverrideInput,
+    ScoreVoidInput,
     TimerControlInput,
 )
 from app.seed import seed_initial_data
@@ -122,6 +123,12 @@ DEFAULT_PIN_ACCOUNTS = [
 ]
 
 RUN_TYPES = {"competition", "demo", "fun", "exhibition", "test"}
+INACTIVE_RUN_STATES = {"finished", "skipped", "withdrawn", "disqualified"}
+DEFAULT_DELAY_PRESETS = [
+    {"key": "lunch_break", "label": "Lunch Break", "message": "Lunch break", "minutes": 30},
+    {"key": "track_cleanup", "label": "Track Cleanup", "message": "Track cleanup", "minutes": 5},
+    {"key": "breakdown_delay", "label": "Breakdown Delay", "message": "Breakdown recovery", "minutes": 10},
+]
 
 
 def get_session(db: Session, session_id: int | None) -> JudgeSession | None:
@@ -229,6 +236,30 @@ def clone_json(value):
     return json.loads(json.dumps(value)) if value is not None else {}
 
 
+def normalize_delay_presets(value) -> list[dict]:
+    source = value if isinstance(value, list) and value else DEFAULT_DELAY_PRESETS
+    presets = []
+    for idx, item in enumerate(source[:3]):
+        raw = item if isinstance(item, dict) else {}
+        fallback = DEFAULT_DELAY_PRESETS[idx] if idx < len(DEFAULT_DELAY_PRESETS) else DEFAULT_DELAY_PRESETS[-1]
+        label = str(raw.get("label") or raw.get("name") or fallback["label"]).strip()[:40] or fallback["label"]
+        message = str(raw.get("message") or label).strip()[:120] or label
+        try:
+            minutes = int(float(raw.get("minutes", raw.get("estimated_minutes", fallback["minutes"])) or 0))
+        except (TypeError, ValueError):
+            minutes = fallback["minutes"]
+        key = str(raw.get("key") or re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_") or f"preset_{idx + 1}")
+        presets.append(
+            {
+                "key": key[:40],
+                "label": label,
+                "message": message,
+                "minutes": max(0, min(240, minutes)),
+            }
+        )
+    return presets or clone_json(DEFAULT_DELAY_PRESETS)
+
+
 def create_default_criteria_set(db: Session, event_id: int) -> CriteriaSet:
     criteria_set = CriteriaSet(event_id=event_id, name="Default Burnout Criteria", active=True)
     db.add(criteria_set)
@@ -295,7 +326,7 @@ def next_run_after(db: Session, run: Run) -> Run | None:
             Run.id != run.id,
             or_(
                 Run.state.is_(None),
-                Run.state.not_in(["finished", "skipped", "withdrawn", "disqualified"]),
+                Run.state.not_in(list(INACTIVE_RUN_STATES)),
             ),
             or_(
                 Run.queue_position > queue_position,
@@ -305,6 +336,41 @@ def next_run_after(db: Session, run: Run) -> Run | None:
         .order_by(Run.queue_position.is_(None), Run.queue_position, Run.id)
         .limit(1)
     )
+
+
+def place_run_next(db: Session, session: JudgeSession, run: Run) -> dict:
+    state = db.scalar(select(CurrentEventState).where(CurrentEventState.event_id == session.event_id))
+    current_run = db.get(Run, state.official_current_run_id) if state and state.official_current_run_id else None
+    active_runs = db.scalars(
+        select(Run)
+        .where(
+            Run.event_id == session.event_id,
+            Run.pad_id == run.pad_id,
+            or_(Run.state.is_(None), Run.state.not_in(list(INACTIVE_RUN_STATES))),
+        )
+        .order_by(Run.queue_position.is_(None), Run.queue_position, Run.id)
+    ).all()
+    if run not in active_runs:
+        active_runs.append(run)
+    ordered = [item for item in active_runs if item.id != run.id]
+    if current_run:
+        current_index = next((idx for idx, item in enumerate(ordered) if item.id == current_run.id), -1)
+        insert_at = current_index + 1 if current_index >= 0 else 0
+    else:
+        insert_at = 0
+    ordered.insert(insert_at, run)
+    changed_positions = []
+    for idx, item in enumerate(ordered, start=1):
+        if item.queue_position != idx:
+            changed_positions.append({"run_id": item.id, "old": item.queue_position, "new": idx})
+            item.queue_position = idx
+    if run.state in INACTIVE_RUN_STATES or not run.state:
+        run.state = "queued"
+    return {
+        "current_run_id": current_run.id if current_run else None,
+        "next_run_id": run.id,
+        "changed_positions": changed_positions,
+    }
 
 
 def active_timer(db: Session, event_id: int, pad_id: int) -> RunTimer | None:
@@ -594,6 +660,28 @@ def set_current_run(run_id: int, session_id: int, db: Session = Depends(get_db))
     )
     db.commit()
     return {"ok": True, "current_run_id": run.id}
+
+
+@router.post("/next-run/{run_id}")
+def set_next_run(run_id: int, session_id: int, db: Session = Depends(get_db)) -> dict:
+    session = get_session(db, session_id)
+    require_admin(session)
+    run = db.get(Run, run_id)
+    if not run or run.event_id != session.event_id:
+        raise HTTPException(status_code=404, detail="Run not found")
+    result = place_run_next(db, session, run)
+    log_action(
+        db,
+        event_id=session.event_id,
+        actor_pin_account_id=session.pin_account_id,
+        device_id=session.device_id,
+        action_type="next_competitor_set",
+        entity_type="run",
+        entity_id=run.id,
+        details=result,
+    )
+    db.commit()
+    return {"ok": True, **result}
 
 
 @router.post("/current-run/clear")
@@ -887,6 +975,7 @@ def get_admin_settings(session_id: int, db: Session = Depends(get_db)) -> dict:
             "show_graphics_total_scores": settings.show_graphics_total_scores,
             "judge_likeness_enabled": settings.judge_likeness_enabled,
             "landing_notice": settings.landing_notice,
+            "delay_presets": normalize_delay_presets(settings.delay_presets),
         },
         "theme": (graphics.layout_config or {}).get("theme") or {},
     }
@@ -908,6 +997,7 @@ def update_admin_settings(payload: EventSettingsInput, db: Session = Depends(get
         "show_graphics_total_scores": settings.show_graphics_total_scores,
         "judge_likeness_enabled": settings.judge_likeness_enabled,
         "landing_notice": settings.landing_notice,
+        "delay_presets": normalize_delay_presets(settings.delay_presets),
     }
     event.name = (payload.event_name or "").strip() or event.name
     event.venue = (payload.venue or "").strip() or None
@@ -918,6 +1008,8 @@ def update_admin_settings(payload: EventSettingsInput, db: Session = Depends(get
     settings.show_graphics_total_scores = bool(payload.show_graphics_total_scores)
     settings.judge_likeness_enabled = bool(payload.judge_likeness_enabled)
     settings.landing_notice = (payload.landing_notice or "").strip() or None
+    if session.role == "owner":
+        settings.delay_presets = normalize_delay_presets(payload.delay_presets)
     log_action(
         db,
         event_id=event.id,
@@ -1182,6 +1274,7 @@ def archive_and_create_event(payload: EventLifecycleInput, db: Session = Depends
             max_judges=current_settings.max_judges,
             landing_notice=current_settings.landing_notice if payload.copy_notice else None,
             connectivity_config=clone_json(current_settings.connectivity_config or {}),
+            delay_presets=clone_json(current_settings.delay_presets or []),
         )
     )
     db.add(CurrentEventState(event_id=new_event.id, pad_id=new_pad.id, current_heat=1))
@@ -1699,6 +1792,43 @@ def create_score_override(payload: ScoreOverrideInput, db: Session = Depends(get
     return {"ok": True, "score": score_entry_payload(override, runs_by_id, judges_by_id)}
 
 
+@router.post("/score-entries/{score_entry_id}/void")
+def void_score_entry(score_entry_id: int, payload: ScoreVoidInput, db: Session = Depends(get_db)) -> dict:
+    session = get_session(db, payload.session_id)
+    require_owner(session)
+    reason = (payload.reason or "").strip()
+    if not reason:
+        raise HTTPException(status_code=400, detail="A reason is required to delete judge scoring")
+    entry = db.get(ScoreEntry, score_entry_id)
+    if not entry or entry.event_id != session.event_id:
+        raise HTTPException(status_code=404, detail="Score entry not found")
+    old_status = entry.status
+    old_active = bool(entry.active_for_results)
+    entry.status = "voided"
+    entry.active_for_results = False
+    entry.reason = "\n".join(part for part in [entry.reason, f"Voided by owner: {reason}"] if part)
+    log_action(
+        db,
+        event_id=session.event_id,
+        actor_pin_account_id=session.pin_account_id,
+        judge_id=entry.judge_id,
+        device_id=session.device_id,
+        action_type="score_entry_voided",
+        entity_type="score_entry",
+        entity_id=entry.id,
+        details={
+            "run_id": entry.run_id,
+            "competitor_id": entry.competitor_id,
+            "judge_id": entry.judge_id,
+            "old_status": old_status,
+            "old_active_for_results": old_active,
+            "reason": reason,
+        },
+    )
+    db.commit()
+    return {"ok": True, "score_entry_id": entry.id, "status": entry.status}
+
+
 def recovery_records_from_payload(raw_payload) -> list[dict]:
     if isinstance(raw_payload, list):
         return [item for item in raw_payload if isinstance(item, dict)]
@@ -1885,6 +2015,19 @@ def list_admin_runs(session_id: int, db: Session = Depends(get_db)) -> dict:
     session = get_session(db, session_id)
     require_admin(session)
     runs = db.scalars(select(Run).where(Run.event_id == session.event_id).order_by(Run.queue_position, Run.id)).all()
+    score_counts = {
+        (competitor_id, heat_number): int(count or 0)
+        for competitor_id, heat_number, count in db.execute(
+            select(Run.competitor_id, Run.heat_number, func.count(ScoreEntry.id))
+            .join(ScoreEntry, ScoreEntry.run_id == Run.id)
+            .where(
+                Run.event_id == session.event_id,
+                ScoreEntry.event_id == session.event_id,
+                ScoreEntry.status.in_(["draft", "submitted"]),
+            )
+            .group_by(Run.competitor_id, Run.heat_number)
+        ).all()
+    }
     return {
         "runs": [
             {
@@ -1895,6 +2038,7 @@ def list_admin_runs(session_id: int, db: Session = Depends(get_db)) -> dict:
                 "run_type": run.run_type,
                 "state": run.state,
                 "include_in_results": run.include_in_results,
+                "heat_score_count": score_counts.get((run.competitor_id, run.heat_number), 0),
                 "competitor": {
                     "entry_number": run.competitor.entry_number,
                     "driver_name": run.competitor.driver_name,
