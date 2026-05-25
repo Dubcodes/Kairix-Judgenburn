@@ -11,9 +11,10 @@ from app.models import JudgeSession, PinAccount, now_utc
 from app.routers import admin, auth, public, scoring
 from app.seed import seed_initial_data
 from app.services.backups import start_backup_scheduler
+from app.version import APP_VERSION
 
 
-app = FastAPI(title="Kairix Judgenburn System")
+app = FastAPI(title="Kairix Judgenburn System", version=APP_VERSION)
 
 app.add_middleware(
     CORSMiddleware,

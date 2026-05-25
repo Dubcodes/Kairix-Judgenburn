@@ -320,6 +320,13 @@
               <button id="refresh-settings" class="btn" data-help="Reload event settings and active session information from the server.">Refresh Settings</button>
             </div>
             <div id="settings-result" class="muted"></div>
+            <div class="settings-about-line">
+              <span id="settings-version" class="muted">Version loading</span>
+              <a id="settings-coffee-link" class="coffee-link" href="https://buymeacoffee.com/dubcodes" target="_blank" rel="noopener noreferrer" data-help="Open the Dubcodes support page.">
+                <span class="coffee-icon" aria-hidden="true">&#9749;</span>
+                <span>Buy me a coffee</span>
+              </a>
+            </div>
           </div>
         </div>
         <div class="card section-gap-md">
@@ -1291,8 +1298,13 @@
           Kairix.API.get(`/api/admin/settings?session_id=${adminState.session.session_id}`),
           Kairix.API.get(`/api/admin/sessions/active?session_id=${adminState.session.session_id}`),
         ]);
+        const app = settings.app || {};
         const event = settings.event || {};
         const config = settings.settings || {};
+        document.getElementById("settings-version").textContent = `Version ${app.version || "unknown"}`;
+        if (app.support_url) {
+          document.getElementById("settings-coffee-link").href = app.support_url;
+        }
         if (document.activeElement !== document.getElementById("settings-event-name")) {
           document.getElementById("settings-event-name").value = event.name || "";
         }

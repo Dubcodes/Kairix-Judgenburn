@@ -63,6 +63,7 @@ from app.services.backups import build_backup_payload, write_backup
 from app.services.results import RESULT_MODE_LABELS, competitor_scoreboard, normalize_result_mode
 from app.services.scoring import calculate_points
 from app.routers.public import DEFAULT_CONNECTIVITY, connectivity_payload
+from app.version import APP_VERSION, SUPPORT_URL
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -960,6 +961,10 @@ def get_admin_settings(session_id: int, db: Session = Depends(get_db)) -> dict:
     settings = event_settings_record(db, event.id)
     graphics = graphics_state_record(db, event.id)
     return {
+        "app": {
+            "version": APP_VERSION,
+            "support_url": SUPPORT_URL,
+        },
         "event": {
             "id": event.id,
             "name": event.name,

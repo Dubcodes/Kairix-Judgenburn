@@ -1616,6 +1616,37 @@ label {
   margin-top: 10px;
 }
 
+.settings-about-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.coffee-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 800;
+  text-decoration: none;
+  opacity: .62;
+}
+
+.coffee-link:hover,
+.coffee-link:focus-visible {
+  opacity: .88;
+  text-decoration: underline;
+}
+
+.coffee-icon {
+  color: var(--muted);
+  filter: grayscale(1);
+  opacity: .72;
+}
+
 .import-summary {
   display: flex;
   flex-wrap: wrap;
@@ -2551,6 +2582,11 @@ label {
   .public-run-list-row b {
     grid-column: 2;
     text-align: left;
+  }
+
+  .settings-about-line {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .brand {

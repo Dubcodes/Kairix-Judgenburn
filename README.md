@@ -109,6 +109,10 @@ Public pages use `/api/public/snapshot`, a cached read-only snapshot that strips
 
 Internal admin, judging, scoring, and OBS pages still use the richer live event state where they need it.
 
+## Version
+
+The running app version is shown in Admin Dashboard -> Settings. Update `app/version.py` when preparing a release so cloned devices and event laptops can confirm they are on the same build.
+
 ## Event-Day Controls
 
 - **Set Next Competitor** moves a competitor directly behind the current run without changing who judges are scoring.
