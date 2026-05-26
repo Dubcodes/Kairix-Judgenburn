@@ -27,7 +27,13 @@ from app.models import (
     ScoreItemEntry,
     Vehicle,
 )
-from app.services.results import competitor_scoreboard, normalize_result_mode, result_mode_label
+from app.services.results import (
+    competitor_scoreboard,
+    normalize_result_mode,
+    normalize_score_aggregation_mode,
+    result_mode_label,
+    score_aggregation_label,
+)
 
 router = APIRouter(prefix="/api", tags=["public"])
 
@@ -88,6 +94,8 @@ def run_payload(run: Run | None, scoreboard: dict | None = None) -> dict | None:
             "counted_heat_count": competitor_score.get("counted_heat_count", 0),
             "result_mode": (scoreboard or {}).get("result_mode"),
             "result_mode_label": (scoreboard or {}).get("result_mode_label"),
+            "score_aggregation_mode": (scoreboard or {}).get("score_aggregation_mode"),
+            "score_aggregation_label": (scoreboard or {}).get("score_aggregation_label"),
         },
         "competitor": {
             "id": run.competitor.id,
@@ -128,6 +136,8 @@ def public_score_payload(run: Run, scoreboard: dict | None, include_scores: bool
         "counted_heat_count": competitor_score.get("counted_heat_count", 0),
         "result_mode": (scoreboard or {}).get("result_mode"),
         "result_mode_label": (scoreboard or {}).get("result_mode_label"),
+        "score_aggregation_mode": (scoreboard or {}).get("score_aggregation_mode"),
+        "score_aggregation_label": (scoreboard or {}).get("score_aggregation_label"),
     }
 
 
@@ -279,7 +289,9 @@ def public_timer_payload(timer: RunTimer | None) -> dict | None:
 
 
 def leaderboard_rows(db: Session, event_id: int, result_mode: str | None) -> list[dict]:
-    scoreboard = competitor_scoreboard(db, event_id, result_mode, limit=12)
+    settings = db.scalar(select(EventSettings).where(EventSettings.event_id == event_id))
+    aggregation_mode = normalize_score_aggregation_mode(settings.score_aggregation_mode if settings else None)
+    scoreboard = competitor_scoreboard(db, event_id, result_mode, aggregation_mode, limit=12)
     return [
         {
             "position": row.get("position"),
@@ -295,6 +307,8 @@ def leaderboard_rows(db: Session, event_id: int, result_mode: str | None) -> lis
             "score_count": row.get("score_count", 0),
             "result_mode": row.get("result_mode"),
             "result_mode_label": row.get("result_mode_label"),
+            "score_aggregation_mode": row.get("score_aggregation_mode"),
+            "score_aggregation_label": row.get("score_aggregation_label"),
         }
         for row in scoreboard["competitors"]
     ]
@@ -327,11 +341,12 @@ def public_snapshot_payload(db: Session) -> dict:
     state = db.scalar(select(CurrentEventState).where(CurrentEventState.event_id == event.id))
     settings = db.scalar(select(EventSettings).where(EventSettings.event_id == event.id))
     result_mode = normalize_result_mode(settings.result_mode if settings else None)
+    aggregation_mode = normalize_score_aggregation_mode(settings.score_aggregation_mode if settings else None)
     show_public_scores = bool(settings.show_public_total_scores if settings else False)
     public_delay_seconds = max(0, int((settings.public_delay_seconds if settings else 0) or 0))
     score_cutoff = datetime.now(timezone.utc) - timedelta(seconds=public_delay_seconds) if public_delay_seconds else None
     scoreboard = (
-        competitor_scoreboard(db, event.id, result_mode, submitted_before=score_cutoff)
+        competitor_scoreboard(db, event.id, result_mode, aggregation_mode, submitted_before=score_cutoff)
         if show_public_scores
         else None
     )
@@ -375,8 +390,12 @@ def public_snapshot_payload(db: Session) -> dict:
         "settings": {
             "result_mode": result_mode,
             "result_mode_label": mode_label,
+            "score_aggregation_mode": aggregation_mode,
+            "score_aggregation_label": score_aggregation_label(aggregation_mode),
             "public_delay_seconds": public_delay_seconds,
             "show_public_total_scores": show_public_scores,
+            "queue_notice": settings.queue_notice if settings else None,
+            "public_notice": settings.public_notice if settings else None,
         },
         "status": {
             "current_heat": state.current_heat if state else 1,
@@ -399,7 +418,8 @@ def event_state_payload(db: Session) -> dict:
     state = db.scalar(select(CurrentEventState).where(CurrentEventState.event_id == event.id))
     settings = db.scalar(select(EventSettings).where(EventSettings.event_id == event.id))
     result_mode = normalize_result_mode(settings.result_mode if settings else None)
-    scoreboard = competitor_scoreboard(db, event.id, result_mode)
+    aggregation_mode = normalize_score_aggregation_mode(settings.score_aggregation_mode if settings else None)
+    scoreboard = competitor_scoreboard(db, event.id, result_mode, aggregation_mode)
     current_run = db.get(Run, state.official_current_run_id) if state and state.official_current_run_id else None
     featured_run = db.get(Run, state.graphics_featured_run_id) if state and state.graphics_featured_run_id else None
     up_next_run = actual_up_next_run(db, event.id, current_run)
@@ -434,11 +454,15 @@ def event_state_payload(db: Session) -> dict:
         "settings": {
             "result_mode": result_mode,
             "result_mode_label": scoreboard["result_mode_label"],
+            "score_aggregation_mode": aggregation_mode,
+            "score_aggregation_label": scoreboard["score_aggregation_label"],
             "public_delay_seconds": settings.public_delay_seconds if settings else 180,
             "show_public_total_scores": settings.show_public_total_scores if settings else False,
             "show_graphics_total_scores": settings.show_graphics_total_scores if settings else False,
             "judge_likeness_enabled": settings.judge_likeness_enabled if settings else True,
             "landing_notice": settings.landing_notice if settings else None,
+            "queue_notice": settings.queue_notice if settings else None,
+            "public_notice": settings.public_notice if settings else None,
             "delay_presets": settings.delay_presets if settings and isinstance(settings.delay_presets, list) else [],
             "connectivity": connectivity_payload(settings),
         },
@@ -563,7 +587,8 @@ def get_queue(db: Session = Depends(get_db)) -> dict:
     event = active_event(db)
     settings = db.scalar(select(EventSettings).where(EventSettings.event_id == event.id))
     result_mode = normalize_result_mode(settings.result_mode if settings else None)
-    scoreboard = competitor_scoreboard(db, event.id, result_mode)
+    aggregation_mode = normalize_score_aggregation_mode(settings.score_aggregation_mode if settings else None)
+    scoreboard = competitor_scoreboard(db, event.id, result_mode, aggregation_mode)
     runs = db.scalars(
         select(Run)
         .where(
@@ -577,7 +602,10 @@ def get_queue(db: Session = Depends(get_db)) -> dict:
         "settings": {
             "result_mode": result_mode,
             "result_mode_label": scoreboard["result_mode_label"],
+            "score_aggregation_mode": aggregation_mode,
+            "score_aggregation_label": scoreboard["score_aggregation_label"],
             "show_public_total_scores": settings.show_public_total_scores if settings else False,
+            "queue_notice": settings.queue_notice if settings else None,
         },
     }
 

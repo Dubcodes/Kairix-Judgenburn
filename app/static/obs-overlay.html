@@ -236,6 +236,12 @@
         return scoreText(score?.total);
       }
 
+      function scoringModeLabel(state) {
+        const heat = state.settings?.result_mode_label || "All heats";
+        const aggregate = state.settings?.score_aggregation_label || "Add all judge totals";
+        return aggregate === "Add all judge totals" ? heat : `${heat} / ${aggregate}`;
+      }
+
       function scoreboardFullHtml(state) {
         const rows = leaderboardSourceRows(state).slice(0, 12);
         const heatNumbers = scoreboardHeatNumbers(rows, state);
@@ -247,7 +253,7 @@
               <div class="scoreboard-kicker">${escapeHtml(state.event?.name || "")}</div>
               <div class="scoreboard-title">${title}</div>
             </div>
-            <div class="scoreboard-mode">${escapeHtml(scoresAllowed ? state.settings?.result_mode_label || "All heats" : "Scores hidden")}</div>
+            <div class="scoreboard-mode">${escapeHtml(scoresAllowed ? scoringModeLabel(state) : "Scores hidden")}</div>
           </div>
           <table class="scoreboard-table">
             <thead>
@@ -286,7 +292,7 @@
               <div class="scoreboard-kicker">${escapeHtml(state.event?.venue || state.event?.name || "")}</div>
               <div class="scoreboard-title">Top Scores</div>
             </div>
-            <div class="scoreboard-mode">${escapeHtml(scoresAllowed ? state.settings?.result_mode_label || "All heats" : "Scores hidden")}</div>
+            <div class="scoreboard-mode">${escapeHtml(scoresAllowed ? scoringModeLabel(state) : "Scores hidden")}</div>
           </div>
           <div class="scoreboard-detail-grid">
             ${rows.map(row => `
@@ -312,7 +318,9 @@
       function runScoreLine(run, state, config = {}) {
         const total = run?.score?.competitor_total;
         if (!state.settings?.show_graphics_total_scores || !config.show_total_score || total === null || total === undefined) return "";
-        const label = run.score?.result_mode_label || state.settings?.result_mode_label || "Total";
+        const label = run.score?.score_aggregation_label && run.score.score_aggregation_label !== "Add all judge totals"
+          ? `${run.score?.result_mode_label || state.settings?.result_mode_label || "Total"} / ${run.score.score_aggregation_label}`
+          : run.score?.result_mode_label || state.settings?.result_mode_label || "Total";
         return `<div style="font-size: 22px; opacity: .9;">${escapeHtml(label)}: ${escapeHtml(Number(total).toFixed(1))}</div>`;
       }
 

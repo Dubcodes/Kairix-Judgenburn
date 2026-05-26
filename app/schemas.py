@@ -184,7 +184,10 @@ class EventSettingsInput(BaseModel):
     venue: str | None = None
     event_date: str | None = None
     landing_notice: str | None = None
+    queue_notice: str | None = None
+    public_notice: str | None = None
     result_mode: str = "total_of_all_runs"
+    score_aggregation_mode: str = "sum_all_judges"
     public_delay_seconds: int = 5
     show_public_total_scores: bool = False
     show_graphics_total_scores: bool = True

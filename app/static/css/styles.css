@@ -78,6 +78,18 @@ a {
   gap: 12px;
 }
 
+.brand-titleline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.brand-account {
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
 .brand-block {
   display: grid;
   gap: 4px;
@@ -207,6 +219,10 @@ a {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
+}
+
+.compact-section-head {
+  margin-bottom: 6px;
 }
 
 .section-head h2,
@@ -1616,6 +1632,78 @@ label {
   margin-top: 10px;
 }
 
+.settings-expand-panel {
+  border: 1px solid #b9b9b1;
+  border-radius: var(--radius);
+  background: #fbfbf8;
+  overflow: hidden;
+}
+
+.settings-expand-panel summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  cursor: pointer;
+  font-weight: 900;
+  list-style: none;
+}
+
+.settings-expand-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-expand-arrow {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.settings-expand-panel[open] .settings-expand-arrow {
+  transform: rotate(180deg);
+}
+
+.scoring-mode-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+
+.scoring-mode-layout h3 {
+  margin: 0 0 8px;
+}
+
+.settings-option-list {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-option-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-height: 0;
+  padding: 10px;
+  border: 1px solid #b9b9b1;
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.settings-option-card strong,
+.settings-option-card em {
+  display: block;
+}
+
+.settings-option-card em {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-style: normal;
+  font-weight: 500;
+}
+
 .settings-about-line {
   display: flex;
   align-items: center;
@@ -1645,6 +1733,78 @@ label {
   color: var(--muted);
   filter: grayscale(1);
   opacity: .72;
+}
+
+.criteria-builder-grid,
+.criteria-edit-grid {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.25fr) minmax(110px, .65fr) minmax(170px, .9fr) repeat(5, minmax(74px, .36fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.criteria-name-field,
+.criteria-type-field {
+  min-width: 0;
+}
+
+.mini-field input {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.criterion-card {
+  border-color: #b7b7ad;
+}
+
+.criterion-example {
+  margin: 8px 0 0;
+  font-size: var(--text-sm);
+}
+
+.criteria-example-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.criteria-example-grid div {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid #b7b7ad;
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.criteria-example-grid span {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.queue-notice,
+.public-notice {
+  border-color: #c4b57b;
+  background: #fffbe8;
+}
+
+.queue-notice {
+  margin-bottom: var(--space-3);
+}
+
+.queue-notice p,
+.public-notice p {
+  margin: 0;
+}
+
+.public-notice {
+  display: grid;
+  gap: 4px;
+  margin-bottom: var(--space-4);
+  padding: 14px 16px;
+  border: 1px solid #c4b57b;
+  border-radius: var(--radius);
+  color: #5f4b00;
 }
 
 .import-summary {
@@ -2438,7 +2598,10 @@ label {
   .gfx-desk,
   .gfx-control-shell,
   .layout-row,
-  .result-detail-grid {
+  .result-detail-grid,
+  .criteria-builder-grid,
+  .criteria-edit-grid,
+  .scoring-mode-layout {
     grid-template-columns: 1fr;
   }
 

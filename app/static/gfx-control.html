@@ -21,7 +21,7 @@
           <a class="btn" href="/obs-overlay" data-help="Open the OBS browser overlay in this tab.">Open Overlay</a>
           <a class="btn" href="/gfx-settings" data-help="Open setup controls for layout, hotkeys, and layer styling.">Settings</a>
           <a class="btn high-admin-link" href="/admin" data-help="Go to the event control dashboard. High-admin and owner only.">Event Control</a>
-          <a class="btn" href="/" data-help="Return to the open landing page.">Home</a>
+          <a class="btn" href="/" data-help="Return to the landing page and PIN login.">Landing Page</a>
         </div>
       </div>
 
@@ -74,9 +74,9 @@
 
     <script src="/static/js/common.js?v=20260505-logo-layers"></script>
     <script>
-      const gfxSession = Kairix.requireRole(["graphics", "high_admin", "owner"]);
-      Kairix.validateSession(gfxSession, ["graphics", "high_admin", "owner"]).catch(() => {});
-      const roleDisplay = role => ({ admin: "Event Control", high_admin: "Admin", owner: "High Admin / Owner", graphics: "Graphics" }[role] || role);
+      const gfxSession = Kairix.requireRole(["graphics", "owner"]);
+      Kairix.validateSession(gfxSession, ["graphics", "owner"]).catch(() => {});
+      const roleDisplay = role => ({ owner: "Owner", graphics: "Graphics" }[role] || role);
       document.getElementById("who").textContent = `${gfxSession.display_name} / ${roleDisplay(gfxSession.role)}`;
       if (gfxSession.role === "graphics") {
         document.querySelectorAll(".high-admin-link").forEach(item => item.style.display = "none");

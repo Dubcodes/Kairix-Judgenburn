@@ -20,7 +20,7 @@
         <div class="btn-row">
           <a class="btn" href="/gfx-control" data-help="Return to the live graphics layer controls.">Graphics Control</a>
           <a class="btn" href="/obs-overlay" data-help="Open the transparent OBS browser overlay.">Open Overlay</a>
-          <a class="btn high-admin-link" href="/admin" data-help="Go to event control. High-admin and owner only.">Event Control</a>
+          <a class="btn high-admin-link" href="/admin" data-help="Go to event control. Owner only.">Event Control</a>
         </div>
       </div>
 
@@ -485,7 +485,14 @@
             const auth = await fetch("/api/auth/session");
             if (auth.ok) {
               session = await auth.json();
+              if (!["graphics", "owner"].includes(session.role)) {
+                window.location.href = "/";
+                return;
+              }
               document.getElementById("who").textContent = `${session.display_name} / ${session.role}`;
+              if (session.role === "graphics") {
+                document.querySelectorAll(".high-admin-link").forEach(item => item.style.display = "none");
+              }
             }
           } catch (_) {}
           try {

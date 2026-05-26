@@ -49,6 +49,9 @@ def ensure_schema_upgrades() -> None:
         conn.execute(text("ALTER TABLE run_timers ADD COLUMN IF NOT EXISTS source VARCHAR(60) DEFAULT 'run_control'"))
         conn.execute(text("ALTER TABLE run_timers ADD COLUMN IF NOT EXISTS notes TEXT"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS landing_notice TEXT"))
+        conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS queue_notice TEXT"))
+        conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS public_notice TEXT"))
+        conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS score_aggregation_mode VARCHAR(40) DEFAULT 'sum_all_judges'"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS connectivity_config JSON DEFAULT '{}'"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_public_total_scores BOOLEAN DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_graphics_total_scores BOOLEAN DEFAULT TRUE"))
@@ -114,12 +117,12 @@ def admin_page(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/gfx-control", include_in_schema=False)
 def gfx_control_page(request: Request, db: Session = Depends(get_db)):
-    return protected_page(request, db, {"graphics", "high_admin", "owner"}, "app/static/gfx-control.html")
+    return protected_page(request, db, {"graphics", "owner"}, "app/static/gfx-control.html")
 
 
 @app.get("/gfx-settings", include_in_schema=False)
 def gfx_settings_page(request: Request, db: Session = Depends(get_db)):
-    return protected_page(request, db, {"graphics", "high_admin", "owner"}, "app/static/gfx-settings.html")
+    return protected_page(request, db, {"graphics", "owner"}, "app/static/gfx-settings.html")
 
 
 @app.get("/obs-overlay", include_in_schema=False)

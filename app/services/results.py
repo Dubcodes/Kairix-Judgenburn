@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
-from app.models import Run, ScoreEntry
+from app.models import CriteriaSet, Criterion, Run, ScoreEntry
 
 
 RESULT_MODE_LABELS = {
@@ -13,13 +13,27 @@ RESULT_MODE_LABELS = {
     "best_3_heats": "Best 3 heats",
 }
 
+SCORE_AGGREGATION_LABELS = {
+    "sum_all_judges": "Add all judge totals",
+    "average_judge_score": "Average judge totals",
+    "normalized_100": "Normalize each heat to 100",
+}
+
 
 def normalize_result_mode(value: str | None) -> str:
     return value if value in RESULT_MODE_LABELS else "total_of_all_runs"
 
 
+def normalize_score_aggregation_mode(value: str | None) -> str:
+    return value if value in SCORE_AGGREGATION_LABELS else "sum_all_judges"
+
+
 def result_mode_label(value: str | None) -> str:
     return RESULT_MODE_LABELS[normalize_result_mode(value)]
+
+
+def score_aggregation_label(value: str | None) -> str:
+    return SCORE_AGGREGATION_LABELS[normalize_score_aggregation_mode(value)]
 
 
 def best_heat_count(value: str | None) -> int | None:
@@ -37,15 +51,43 @@ def score_value(value: float | None) -> float | None:
     return round(float(value), 2)
 
 
+def criterion_max_points(criterion: Criterion) -> float:
+    points = float(criterion.points_per_unit or 0)
+    max_value = float(criterion.max_value or 0)
+    if criterion.type in {"deduction", "count_penalty"}:
+        return 0.0
+    if criterion.type in {"checkbox", "toggle"}:
+        return max(0.0, points)
+    return max(0.0, max_value * points)
+
+
+def max_single_judge_score(db: Session, event_id: int) -> float:
+    criteria_set = db.scalar(
+        select(CriteriaSet).where(CriteriaSet.event_id == event_id, CriteriaSet.active.is_(True)).limit(1)
+    )
+    if not criteria_set:
+        return 0.0
+    criteria = db.scalars(
+        select(Criterion).where(Criterion.criteria_set_id == criteria_set.id, Criterion.active.is_(True))
+    ).all()
+    return sum(criterion_max_points(item) for item in criteria)
+
+
 def competitor_scoreboard(
     db: Session,
     event_id: int,
     result_mode: str | None,
+    score_aggregation_mode: str | None = None,
     limit: int | None = None,
     submitted_before: datetime | None = None,
 ) -> dict:
     mode = normalize_result_mode(result_mode)
+    aggregation_mode = normalize_score_aggregation_mode(score_aggregation_mode)
     best_count = best_heat_count(mode)
+    aggregate_expr = func.sum(ScoreEntry.total)
+    if aggregation_mode in {"average_judge_score", "normalized_100"}:
+        aggregate_expr = func.avg(ScoreEntry.total)
+    max_score = max_single_judge_score(db, event_id) if aggregation_mode == "normalized_100" else 0.0
     score_conditions = [
         ScoreEntry.run_id == Run.id,
         ScoreEntry.event_id == event_id,
@@ -57,7 +99,7 @@ def competitor_scoreboard(
     rows = db.execute(
         select(
             Run,
-            func.coalesce(func.sum(ScoreEntry.total), 0).label("total"),
+            func.coalesce(aggregate_expr, 0).label("total"),
             func.count(ScoreEntry.id).label("score_count"),
         )
         .outerjoin(ScoreEntry, and_(*score_conditions))
@@ -71,6 +113,8 @@ def competitor_scoreboard(
     for run, raw_total, raw_score_count in rows:
         score_count = int(raw_score_count or 0)
         run_total = float(raw_total or 0) if score_count else None
+        if aggregation_mode == "normalized_100" and run_total is not None and max_score > 0:
+            run_total = (run_total / max_score) * 100
         by_run_id[run.id] = {
             "run_total": score_value(run_total),
             "score_count": score_count,
@@ -122,6 +166,8 @@ def competitor_scoreboard(
             "queue_position": competitor["queue_position"],
             "result_mode": mode,
             "result_mode_label": result_mode_label(mode),
+            "score_aggregation_mode": aggregation_mode,
+            "score_aggregation_label": score_aggregation_label(aggregation_mode),
         }
         ranked.append(payload)
         by_competitor_id[competitor["competitor_id"]] = payload
@@ -143,6 +189,9 @@ def competitor_scoreboard(
     return {
         "result_mode": mode,
         "result_mode_label": result_mode_label(mode),
+        "score_aggregation_mode": aggregation_mode,
+        "score_aggregation_label": score_aggregation_label(aggregation_mode),
+        "max_single_judge_score": score_value(max_score) if max_score else None,
         "best_heat_count": best_count,
         "competitors": scored_ranked,
         "by_competitor_id": by_competitor_id,

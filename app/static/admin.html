@@ -13,14 +13,16 @@
         <div class="brand-block">
           <div class="brand-row">
             <img class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
-            <div class="brand">Admin Dashboard</div>
+            <div class="brand-titleline">
+              <span class="brand">Admin Dashboard</span>
+              <span id="who" class="brand-account muted"></span>
+            </div>
           </div>
-          <div id="who" class="muted"></div>
         </div>
         <div class="btn-row">
-          <a class="btn high-admin-link" href="/gfx-control" data-help="Open the graphics control board. Available to high admin and owner.">Graphics</a>
+          <a class="btn graphics-owner-link" href="/gfx-control" data-help="Open the graphics control board. Owner only from the admin dashboard.">Graphics</a>
           <a class="btn" href="/queue" data-help="Open the public-safe competitor queue display in this tab.">Queue Display</a>
-          <a class="btn" href="/" data-help="Return to the landing page and PIN login.">Home</a>
+          <a class="btn" href="/" data-help="Return to the landing page and PIN login.">Landing Page</a>
         </div>
       </div>
 
@@ -234,25 +236,25 @@
       <section id="panel-criteria" class="panel">
         <div class="card">
           <h2>Criteria Builder</h2>
-          <div class="grid tight">
-            <label>Name <input id="crit-name" placeholder="Instant Smoke"></label>
+          <div class="criteria-builder-grid">
+            <label class="criteria-name-field">Name <input id="crit-name" placeholder="Instant Smoke"></label>
             <label>Short Label <input id="crit-short" placeholder="Smoke"></label>
-              <label>Type
-                <select id="crit-type">
-                  <option value="numeric_score">Numeric score</option>
-                  <option value="positive_bonus">Positive bonus</option>
-                  <option value="deduction">Deduction</option>
-                  <option value="count_bonus">Count bonus</option>
-                  <option value="count_penalty">Count penalty</option>
-                  <option value="checkbox">Checkbox</option>
-                  <option value="toggle">Toggle</option>
-                </select>
-              </label>
-            <label>Min <input id="crit-min" type="number" value="0"></label>
-            <label>Max <input id="crit-max" type="number" value="10"></label>
-            <label>Step <input id="crit-step" type="number" value="1"></label>
-            <label>Points / Unit <input id="crit-points" type="number" value="1"></label>
-            <label>Order <input id="crit-order" type="number" value="100"></label>
+            <label class="criteria-type-field">Type
+              <select id="crit-type">
+                <option value="numeric_score">Numeric score</option>
+                <option value="positive_bonus">Positive bonus</option>
+                <option value="deduction">Deduction</option>
+                <option value="count_bonus">Count bonus</option>
+                <option value="count_penalty">Count penalty</option>
+                <option value="checkbox">Checkbox</option>
+                <option value="toggle">Toggle</option>
+              </select>
+            </label>
+            <label class="mini-field">Min <input id="crit-min" type="number" value="0"></label>
+            <label class="mini-field">Max <input id="crit-max" type="number" value="10"></label>
+            <label class="mini-field">Step <input id="crit-step" type="number" value="1"></label>
+            <label class="mini-field">Points / Unit <input id="crit-points" type="number" value="1"></label>
+            <label class="mini-field">Order <input id="crit-order" type="number" value="100"></label>
           </div>
           <div class="btn-row section-gap-sm">
             <label><input id="crit-required" type="checkbox"> Required warning</label>
@@ -267,7 +269,13 @@
           <div id="criteria-list"></div>
           <div class="notice criterion-math-info section-gap-md">
             <strong>Scoring type maths</strong>
-            <p class="muted">Numeric score, positive bonus, and count bonus add value x points. Deduction and count penalty subtract value x points. Checkbox and toggle add the points value when on, or 0 when off. Allows negative only controls whether judges can type below zero; deduction types are already negative by design.</p>
+            <div class="criteria-example-grid section-gap-sm">
+              <div><strong>Numeric score</strong><span>Judge enters 8, points/unit 2 = +16.</span></div>
+              <div><strong>Count penalty</strong><span>Judge enters 2, points/unit 10 = -20.</span></div>
+              <div><strong>Count bonus</strong><span>Judge enters 1, points/unit 5 = +5.</span></div>
+              <div><strong>Toggle / checkbox</strong><span>On adds the points value once; off adds 0.</span></div>
+            </div>
+            <p class="muted">Deduction and count penalty types always subtract. Allows negative only controls whether judges can type below zero; it does not make a penalty positive.</p>
           </div>
         </div>
       </section>
@@ -282,23 +290,11 @@
               <label>Venue <input id="settings-venue" placeholder="Venue name"></label>
               <label>Event date <input id="settings-date" placeholder="2026-05-06"></label>
               <label>Public delay seconds <input id="settings-public-delay" type="number" min="0" value="0"></label>
-              <label>Heat total scoring mode
-                <select id="settings-result-mode">
-                  <option value="total_of_all_runs">All heats</option>
-                  <option value="best_1_heat">Best 1 heat</option>
-                  <option value="best_2_heats">Best 2 heats</option>
-                  <option value="best_3_heats">Best 3 heats</option>
-                </select>
-              </label>
             </div>
             <label class="check">
               <input id="settings-likeness" type="checkbox">
               Judge likeness mode available
             </label>
-            <div class="notice">
-              <strong>Heat scoring / best-of totals</strong>
-              <p class="muted">Use Scoring total mode to choose whether overall results count every heat or only each competitor's best 1, 2, or 3 heats. This setting feeds Results, public queue totals, and graphics scoreboards.</p>
-            </div>
             <label class="check">
               <input id="settings-public-total-scores" type="checkbox">
               Show competitor total scores on public queue displays
@@ -315,8 +311,14 @@
             <label>Landing-page notice
               <textarea id="settings-landing-notice" rows="4" placeholder="Optional notice shown in the message box at the bottom of the home page. Leave blank to hide it."></textarea>
             </label>
+            <label>Queue Display notice
+              <textarea id="settings-queue-notice" rows="3" placeholder="Optional notice shown on the public-safe queue display. Leave blank to hide it."></textarea>
+            </label>
+            <label>Public display notice
+              <textarea id="settings-public-notice" rows="3" placeholder="Optional notice shown on the public display views. Leave blank to hide it."></textarea>
+            </label>
             <div class="btn-row settings-actions">
-              <button id="save-settings" class="btn primary" data-help="Save event settings, the landing-page notice, and public delay defaults.">Save Settings</button>
+              <button id="save-settings" class="btn primary" data-help="Save event settings, public notices, scoring visibility, and delay defaults.">Save Settings</button>
               <button id="refresh-settings" class="btn" data-help="Reload event settings and active session information from the server.">Refresh Settings</button>
             </div>
             <div id="settings-result" class="muted"></div>
@@ -328,6 +330,67 @@
               </a>
             </div>
           </div>
+        </div>
+        <div class="card section-gap-md">
+          <div class="section-head compact-section-head">
+            <div>
+              <h2>Heat Total Scoring</h2>
+              <p class="muted">Owner controlled. High admin can see how totals are being calculated.</p>
+            </div>
+            <span id="settings-scoring-owner-note" class="status-pill">Owner editable</span>
+          </div>
+          <input id="settings-result-mode" type="hidden" value="total_of_all_runs">
+          <input id="settings-score-aggregation-mode" type="hidden" value="sum_all_judges">
+          <details class="settings-expand-panel" id="settings-scoring-panel">
+            <summary>
+              <span id="settings-scoring-summary">All heats - add all judge totals</span>
+              <span class="settings-expand-arrow" aria-hidden="true">&#9662;</span>
+            </summary>
+            <div class="scoring-mode-layout">
+              <div>
+                <h3>Which heats count</h3>
+                <div class="settings-option-list">
+                  <label class="settings-option-card">
+                    <input type="radio" name="settings-result-mode-choice" value="total_of_all_runs" data-owner-setting>
+                    <span><strong>All heats</strong><em>Every completed heat contributes to the competitor total.</em></span>
+                  </label>
+                  <label class="settings-option-card">
+                    <input type="radio" name="settings-result-mode-choice" value="best_1_heat" data-owner-setting>
+                    <span><strong>Best 1 heat</strong><em>Only the competitor's highest heat total is counted.</em></span>
+                  </label>
+                  <label class="settings-option-card">
+                    <input type="radio" name="settings-result-mode-choice" value="best_2_heats" data-owner-setting>
+                    <span><strong>Best 2 heats</strong><em>Useful for three-heat events where the lowest heat is dropped.</em></span>
+                  </label>
+                  <label class="settings-option-card">
+                    <input type="radio" name="settings-result-mode-choice" value="best_3_heats" data-owner-setting>
+                    <span><strong>Best 3 heats</strong><em>Counts the best three heats when extra rounds exist.</em></span>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <h3>How judge totals combine</h3>
+                <div class="settings-option-list">
+                  <label class="settings-option-card">
+                    <input type="radio" name="settings-score-aggregation-choice" value="sum_all_judges" data-owner-setting>
+                    <span><strong>Add all judge totals</strong><em>Current burnout style: Judge 1 + Judge 2 + any extra judges.</em></span>
+                  </label>
+                  <label class="settings-option-card">
+                    <input type="radio" name="settings-score-aggregation-choice" value="average_judge_score" data-owner-setting>
+                    <span><strong>Average judge totals</strong><em>Keeps totals comparable if the number of judges changes.</em></span>
+                  </label>
+                  <label class="settings-option-card">
+                    <input type="radio" name="settings-score-aggregation-choice" value="normalized_100" data-owner-setting>
+                    <span><strong>Normalize each heat to 100</strong><em>Averages judge totals, then scales against the configured criteria maximum.</em></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="notice section-gap-sm">
+              <strong>Example</strong>
+              <p id="settings-scoring-example" class="muted">All heats adds every heat total together. Add all judge totals means two 80-point judge scores become 160 for that heat.</p>
+            </div>
+          </details>
         </div>
         <div class="card section-gap-md">
           <h2>Active Sessions</h2>
@@ -573,6 +636,17 @@
         ["checkbox", "Checkbox"],
         ["toggle", "Toggle"],
       ];
+      const RESULT_MODE_DETAILS = {
+        total_of_all_runs: { label: "All heats", example: "All heats adds every completed heat total together." },
+        best_1_heat: { label: "Best 1 heat", example: "Best 1 keeps only the competitor's highest heat total." },
+        best_2_heats: { label: "Best 2 heats", example: "Best 2 keeps the two highest heat totals, which suits a three-heat event with a dropped worst heat." },
+        best_3_heats: { label: "Best 3 heats", example: "Best 3 keeps the best three heat totals if the event has extra rounds." },
+      };
+      const SCORE_AGGREGATION_DETAILS = {
+        sum_all_judges: { label: "Add all judge totals", example: "Two 80-point judge scores become 160 for that heat." },
+        average_judge_score: { label: "Average judge totals", example: "Two judge scores of 80 and 70 become 75 for that heat." },
+        normalized_100: { label: "Normalize each heat to 100", example: "The average judge score is scaled against the criteria maximum so each heat is out of 100." },
+      };
       const DEFAULT_DELAY_PRESETS = adminState.delayPresets.map(item => ({ ...item }));
       Kairix.validateSession(adminState.session, ["admin", "high_admin", "owner"]).catch(() => {});
       function isInvalidSessionError(value) {
@@ -598,6 +672,42 @@
 
       function criterionTypeOptions(selected) {
         return CRITERION_TYPES.map(([value, label]) => `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`).join("");
+      }
+
+      function selectedRadioValue(name, fallback) {
+        return document.querySelector(`input[name="${name}"]:checked`)?.value || fallback;
+      }
+
+      function setRadioValue(name, value, fallback) {
+        const next = value || fallback;
+        document.querySelectorAll(`input[name="${name}"]`).forEach(input => {
+          input.checked = input.value === next;
+        });
+      }
+
+      function updateScoringModeSummary(config = {}) {
+        const resultMode = config.result_mode || document.getElementById("settings-result-mode").value || "total_of_all_runs";
+        const aggregationMode = config.score_aggregation_mode || document.getElementById("settings-score-aggregation-mode").value || "sum_all_judges";
+        document.getElementById("settings-result-mode").value = resultMode;
+        document.getElementById("settings-score-aggregation-mode").value = aggregationMode;
+        setRadioValue("settings-result-mode-choice", resultMode, "total_of_all_runs");
+        setRadioValue("settings-score-aggregation-choice", aggregationMode, "sum_all_judges");
+        const resultDetail = RESULT_MODE_DETAILS[resultMode] || RESULT_MODE_DETAILS.total_of_all_runs;
+        const aggregationDetail = SCORE_AGGREGATION_DETAILS[aggregationMode] || SCORE_AGGREGATION_DETAILS.sum_all_judges;
+        document.getElementById("settings-scoring-summary").textContent = `${resultDetail.label} - ${aggregationDetail.label}`;
+        document.getElementById("settings-scoring-example").textContent = `${resultDetail.example} ${aggregationDetail.example}`;
+      }
+
+      function criterionMathExample(item) {
+        const points = Number(item.points_per_unit || 0);
+        const sample = item.type === "checkbox" || item.type === "toggle" ? 1 : item.type?.includes("penalty") || item.type === "deduction" ? 2 : Math.min(8, Number(item.max_value || 8) || 8);
+        if (item.type === "count_penalty" || item.type === "deduction") {
+          return `Example: judge enters ${sample}; ${scoreValue(points)} points each = -${scoreValue(Math.abs(sample * points))}.`;
+        }
+        if (item.type === "checkbox" || item.type === "toggle") {
+          return `Example: on = +${scoreValue(points)}, off = 0.`;
+        }
+        return `Example: judge enters ${sample}; ${scoreValue(points)} points each = +${scoreValue(sample * points)}.`;
       }
 
       function normalizeDelayPresets(presets = []) {
@@ -673,9 +783,12 @@
         }));
       }
 
-      document.getElementById("who").textContent = `${adminState.session.display_name} / ${roleDisplay(adminState.session.role)}`;
+      document.getElementById("who").textContent = `- ${adminState.session.display_name || roleDisplay(adminState.session.role)}`;
       if (adminState.session.role !== "owner") {
         document.querySelectorAll(".owner-only").forEach(item => item.style.display = "none");
+        document.querySelectorAll(".graphics-owner-link").forEach(item => item.style.display = "none");
+        document.querySelectorAll("[data-owner-setting]").forEach(item => item.disabled = true);
+        document.getElementById("settings-scoring-owner-note").textContent = "View only";
       }
       if (!["high_admin", "owner"].includes(adminState.session.role)) {
         document.querySelectorAll(".high-admin-only").forEach(item => item.style.display = "none");
@@ -1045,7 +1158,7 @@
           <button class="btn compact ${adminState.resultView === "table" ? "active-state" : ""}" data-result-view="table" data-help="Show a compact summary table for the selected heat.">Summary Table</button>
         `;
         document.getElementById("results").innerHTML = adminState.resultView === "overall"
-          ? renderOverallResults(results.overall_results || [], results.result_mode_label)
+          ? renderOverallResults(results.overall_results || [], results.result_mode_label, results.score_aggregation_label)
           : adminState.resultView === "table"
           ? renderResultsTable(heatRows)
           : adminState.resultView === "judges"
@@ -1053,8 +1166,11 @@
             : renderResultCards(heatRows);
       }
 
-      function renderOverallResults(rows, modeLabel) {
+      function renderOverallResults(rows, modeLabel, aggregationLabel) {
         if (!rows.length) return `<p class="muted">No submitted competitor totals yet.</p>`;
+        const scoringLabel = aggregationLabel && aggregationLabel !== "Add all judge totals"
+          ? `${modeLabel || "All heats"} / ${aggregationLabel}`
+          : modeLabel || "All heats";
         return `
           <table class="table">
             <thead><tr><th>Pos</th><th>Competitor</th><th>Vehicle</th><th>Mode</th><th>Counted Heats</th><th>Total</th></tr></thead>
@@ -1064,7 +1180,7 @@
                   <td>${row.position || ""}</td>
                   <td>#${escapeHtml(row.entry_number)} ${escapeHtml(row.driver_name)}</td>
                   <td>${escapeHtml(row.vehicle_name || "")}</td>
-                  <td>${escapeHtml(modeLabel || row.result_mode_label || "All heats")}</td>
+                  <td>${escapeHtml(scoringLabel || row.result_mode_label || "All heats")}</td>
                   <td>${row.counted_heat_count || 0}</td>
                   <td>${scoreValue(row.total)}</td>
                 </tr>
@@ -1317,9 +1433,8 @@
         if (document.activeElement !== document.getElementById("settings-public-delay")) {
           document.getElementById("settings-public-delay").value = config.public_delay_seconds ?? 0;
         }
-        if (document.activeElement !== document.getElementById("settings-result-mode")) {
-          document.getElementById("settings-result-mode").value = config.result_mode || "total_of_all_runs";
-        }
+        const scoringEditing = document.activeElement?.closest?.("#settings-scoring-panel");
+        if (!scoringEditing) updateScoringModeSummary(config);
         if (document.activeElement !== document.getElementById("settings-likeness")) {
           document.getElementById("settings-likeness").checked = Boolean(config.judge_likeness_enabled);
         }
@@ -1331,6 +1446,12 @@
         }
         if (document.activeElement !== document.getElementById("settings-landing-notice")) {
           document.getElementById("settings-landing-notice").value = config.landing_notice || "";
+        }
+        if (document.activeElement !== document.getElementById("settings-queue-notice")) {
+          document.getElementById("settings-queue-notice").value = config.queue_notice || "";
+        }
+        if (document.activeElement !== document.getElementById("settings-public-notice")) {
+          document.getElementById("settings-public-notice").value = config.public_notice || "";
         }
         const presetEditing = document.activeElement?.closest?.("#settings-delay-presets");
         if (!presetEditing) {
@@ -1553,19 +1674,20 @@
       async function refreshCriteria() {
         const data = await Kairix.API.get(`/api/admin/criteria?session_id=${adminState.session.session_id}`);
         document.getElementById("criteria-list").innerHTML = data.criteria.map(item => `
-          <div class="card" data-criterion-row="${item.id}">
-            <div class="grid tight">
-              <label>Name <input data-crit-field="name" value="${item.name}"></label>
+          <div class="card criterion-card" data-criterion-row="${item.id}">
+            <div class="criteria-edit-grid">
+              <label class="criteria-name-field">Name <input data-crit-field="name" value="${item.name}"></label>
               <label>Short <input data-crit-field="short_label" value="${item.short_label || ""}"></label>
-              <label>Type
+              <label class="criteria-type-field">Type
                 <select data-crit-field="type">${criterionTypeOptions(item.type)}</select>
               </label>
-              <label>Min <input data-crit-field="min_value" type="number" value="${item.min_value ?? ""}"></label>
-              <label>Max <input data-crit-field="max_value" type="number" value="${item.max_value ?? ""}"></label>
-              <label>Step <input data-crit-field="step_size" type="number" value="${item.step_size}"></label>
-              <label>Points <input data-crit-field="points_per_unit" type="number" value="${item.points_per_unit}"></label>
-              <label>Order <input data-crit-field="display_order" type="number" value="${item.display_order}"></label>
+              <label class="mini-field">Min <input data-crit-field="min_value" type="number" value="${item.min_value ?? ""}"></label>
+              <label class="mini-field">Max <input data-crit-field="max_value" type="number" value="${item.max_value ?? ""}"></label>
+              <label class="mini-field">Step <input data-crit-field="step_size" type="number" value="${item.step_size}"></label>
+              <label class="mini-field">Points <input data-crit-field="points_per_unit" type="number" value="${item.points_per_unit}"></label>
+              <label class="mini-field">Order <input data-crit-field="display_order" type="number" value="${item.display_order}"></label>
             </div>
+            <p class="criterion-example muted">${escapeHtml(criterionMathExample(item))}</p>
             <div class="btn-row" style="margin-top:8px;">
               <label><input data-crit-field="required" type="checkbox" ${item.required ? "checked" : ""}> Required</label>
               <label><input data-crit-field="allows_negative" type="checkbox" ${item.allows_negative ? "checked" : ""}> Negative</label>
@@ -2091,6 +2213,14 @@
         refreshCriteria();
       });
 
+      document.querySelectorAll("input[name='settings-result-mode-choice'], input[name='settings-score-aggregation-choice']").forEach(input => {
+        input.addEventListener("change", () => {
+          document.getElementById("settings-result-mode").value = selectedRadioValue("settings-result-mode-choice", "total_of_all_runs");
+          document.getElementById("settings-score-aggregation-mode").value = selectedRadioValue("settings-score-aggregation-choice", "sum_all_judges");
+          updateScoringModeSummary();
+        });
+      });
+
       document.getElementById("save-settings").addEventListener("click", async event => {
         await Kairix.withButtonFeedback(event.currentTarget, () => Kairix.API.put("/api/admin/settings", {
           session_id: adminState.session.session_id,
@@ -2098,12 +2228,15 @@
           venue: document.getElementById("settings-venue").value || null,
           event_date: document.getElementById("settings-date").value || null,
           result_mode: document.getElementById("settings-result-mode").value,
+          score_aggregation_mode: document.getElementById("settings-score-aggregation-mode").value,
           public_delay_seconds: Number(document.getElementById("settings-public-delay").value || 0),
           show_public_total_scores: document.getElementById("settings-public-total-scores").checked,
           show_graphics_total_scores: document.getElementById("settings-graphics-total-scores").checked,
           judge_likeness_enabled: document.getElementById("settings-likeness").checked,
           delay_presets: collectDelayPresets(),
           landing_notice: document.getElementById("settings-landing-notice").value || null,
+          queue_notice: document.getElementById("settings-queue-notice").value || null,
+          public_notice: document.getElementById("settings-public-notice").value || null,
         }));
         adminState.delayPresets = collectDelayPresets();
         renderDelayPresetButtons();

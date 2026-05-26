@@ -60,7 +60,13 @@ from app.seed import seed_initial_data
 from app.services.audit import log_action
 from app.services.backups import backup_health as backup_health_snapshot
 from app.services.backups import build_backup_payload, write_backup
-from app.services.results import RESULT_MODE_LABELS, competitor_scoreboard, normalize_result_mode
+from app.services.results import (
+    RESULT_MODE_LABELS,
+    SCORE_AGGREGATION_LABELS,
+    competitor_scoreboard,
+    normalize_result_mode,
+    normalize_score_aggregation_mode,
+)
 from app.services.scoring import calculate_points
 from app.routers.public import DEFAULT_CONNECTIVITY, connectivity_payload
 from app.version import APP_VERSION, SUPPORT_URL
@@ -147,9 +153,9 @@ def require_admin(session: JudgeSession | None) -> None:
         raise HTTPException(status_code=403, detail="Admin session required")
 
 
-def require_graphics_or_admin(session: JudgeSession | None) -> None:
-    if not session or session.role not in {"graphics", "high_admin", "owner"}:
-        raise HTTPException(status_code=403, detail="Graphics, high-admin, or owner session required")
+def require_graphics_or_owner(session: JudgeSession | None) -> None:
+    if not session or session.role not in {"graphics", "owner"}:
+        raise HTTPException(status_code=403, detail="Graphics or owner session required")
 
 
 def require_owner(session: JudgeSession | None) -> None:
@@ -854,7 +860,7 @@ def create_delay(payload: DelayInput, db: Session = Depends(get_db)) -> dict:
     if payload.official:
         require_admin(session)
     else:
-        require_graphics_or_admin(session)
+        require_graphics_or_owner(session)
 
     event_id = session.event_id if session else 1
     pad = get_event_pad(db, event_id)
@@ -928,7 +934,7 @@ def update_graphics_state(
     if session_id is None and kairix_session_id and kairix_session_id.isdigit():
         session_id = int(kairix_session_id)
     session = get_session(db, session_id)
-    require_graphics_or_admin(session)
+    require_graphics_or_owner(session)
     state = db.scalar(select(GraphicsState).where(GraphicsState.event_id == session.event_id))
     if not state:
         raise HTTPException(status_code=404, detail="Graphics state not found")
@@ -975,11 +981,18 @@ def get_admin_settings(session_id: int, db: Session = Depends(get_db)) -> dict:
         "settings": {
             "result_mode": normalize_result_mode(settings.result_mode),
             "result_mode_label": RESULT_MODE_LABELS.get(normalize_result_mode(settings.result_mode), "All heats"),
+            "score_aggregation_mode": normalize_score_aggregation_mode(settings.score_aggregation_mode),
+            "score_aggregation_label": SCORE_AGGREGATION_LABELS.get(
+                normalize_score_aggregation_mode(settings.score_aggregation_mode),
+                "Add all judge totals",
+            ),
             "public_delay_seconds": settings.public_delay_seconds,
             "show_public_total_scores": settings.show_public_total_scores,
             "show_graphics_total_scores": settings.show_graphics_total_scores,
             "judge_likeness_enabled": settings.judge_likeness_enabled,
             "landing_notice": settings.landing_notice,
+            "queue_notice": settings.queue_notice,
+            "public_notice": settings.public_notice,
             "delay_presets": normalize_delay_presets(settings.delay_presets),
         },
         "theme": (graphics.layout_config or {}).get("theme") or {},
@@ -997,22 +1010,29 @@ def update_admin_settings(payload: EventSettingsInput, db: Session = Depends(get
         "venue": event.venue,
         "event_date": event.event_date,
         "result_mode": settings.result_mode,
+        "score_aggregation_mode": settings.score_aggregation_mode,
         "public_delay_seconds": settings.public_delay_seconds,
         "show_public_total_scores": settings.show_public_total_scores,
         "show_graphics_total_scores": settings.show_graphics_total_scores,
         "judge_likeness_enabled": settings.judge_likeness_enabled,
         "landing_notice": settings.landing_notice,
+        "queue_notice": settings.queue_notice,
+        "public_notice": settings.public_notice,
         "delay_presets": normalize_delay_presets(settings.delay_presets),
     }
     event.name = (payload.event_name or "").strip() or event.name
     event.venue = (payload.venue or "").strip() or None
     event.event_date = (payload.event_date or "").strip() or None
-    settings.result_mode = normalize_result_mode(payload.result_mode)
+    if session.role == "owner":
+        settings.result_mode = normalize_result_mode(payload.result_mode)
+        settings.score_aggregation_mode = normalize_score_aggregation_mode(payload.score_aggregation_mode)
     settings.public_delay_seconds = max(0, int(payload.public_delay_seconds or 0))
     settings.show_public_total_scores = bool(payload.show_public_total_scores)
     settings.show_graphics_total_scores = bool(payload.show_graphics_total_scores)
     settings.judge_likeness_enabled = bool(payload.judge_likeness_enabled)
     settings.landing_notice = (payload.landing_notice or "").strip() or None
+    settings.queue_notice = (payload.queue_notice or "").strip() or None
+    settings.public_notice = (payload.public_notice or "").strip() or None
     if session.role == "owner":
         settings.delay_presets = normalize_delay_presets(payload.delay_presets)
     log_action(
@@ -1032,7 +1052,7 @@ def update_admin_settings(payload: EventSettingsInput, db: Session = Depends(get
 @router.post("/result-mode/{result_mode}")
 def update_result_mode(result_mode: str, session_id: int, db: Session = Depends(get_db)) -> dict:
     session = get_session(db, session_id)
-    require_high_admin(session)
+    require_owner(session)
     event = db.get(Event, session.event_id) or active_event(db)
     settings = event_settings_record(db, event.id)
     old = settings.result_mode
@@ -1177,7 +1197,7 @@ def active_sessions_summary(session_id: int, db: Session = Depends(get_db)) -> d
 @router.get("/graphics/layout-export")
 def export_graphics_layout(session_id: int, db: Session = Depends(get_db)) -> dict:
     session = get_session(db, session_id)
-    require_graphics_or_admin(session)
+    require_graphics_or_owner(session)
     state = graphics_state_record(db, session.event_id)
     event = db.get(Event, session.event_id)
     return {
@@ -1206,7 +1226,7 @@ async def import_graphics_layout(
     db: Session = Depends(get_db),
 ) -> dict:
     session = get_session(db, session_id)
-    require_graphics_or_admin(session)
+    require_graphics_or_owner(session)
     content = await file.read()
     try:
         payload = json.loads(content.decode("utf-8"))
@@ -1271,6 +1291,7 @@ def archive_and_create_event(payload: EventLifecycleInput, db: Session = Depends
         EventSettings(
             event_id=new_event.id,
             result_mode=current_settings.result_mode,
+            score_aggregation_mode=current_settings.score_aggregation_mode,
             public_delay_seconds=current_settings.public_delay_seconds,
             show_public_total_scores=current_settings.show_public_total_scores,
             show_graphics_total_scores=current_settings.show_graphics_total_scores,
@@ -1278,6 +1299,8 @@ def archive_and_create_event(payload: EventLifecycleInput, db: Session = Depends
             allow_submit_with_nulls=current_settings.allow_submit_with_nulls,
             max_judges=current_settings.max_judges,
             landing_notice=current_settings.landing_notice if payload.copy_notice else None,
+            queue_notice=current_settings.queue_notice if payload.copy_notice else None,
+            public_notice=current_settings.public_notice if payload.copy_notice else None,
             connectivity_config=clone_json(current_settings.connectivity_config or {}),
             delay_presets=clone_json(current_settings.delay_presets or []),
         )
@@ -1429,7 +1452,7 @@ def safe_logo_path(filename: str) -> Path:
 @router.get("/graphics/logos")
 def list_graphics_logos(session_id: int, db: Session = Depends(get_db)) -> dict:
     session = get_session(db, session_id)
-    require_graphics_or_admin(session)
+    require_graphics_or_owner(session)
     LOGO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     files = sorted(
         (logo_file_payload(path) for path in LOGO_UPLOAD_DIR.glob("*.png") if path.is_file()),
@@ -1446,7 +1469,7 @@ async def upload_graphics_logo(
     db: Session = Depends(get_db),
 ) -> dict:
     session = get_session(db, session_id)
-    require_graphics_or_admin(session)
+    require_graphics_or_owner(session)
     if file.content_type not in ALLOWED_LOGO_TYPES:
         raise HTTPException(status_code=400, detail="Logo must be a PNG file")
     content = await file.read()
@@ -1487,7 +1510,7 @@ async def upload_graphics_logo(
 @router.delete("/graphics/logos/{filename}")
 def delete_graphics_logo(filename: str, session_id: int, db: Session = Depends(get_db)) -> dict:
     session = get_session(db, session_id)
-    require_graphics_or_admin(session)
+    require_graphics_or_owner(session)
     path = safe_logo_path(filename)
     if not path.exists():
         raise HTTPException(status_code=404, detail="Logo not found")
@@ -1517,7 +1540,7 @@ def delete_graphics_logo(filename: str, session_id: int, db: Session = Depends(g
 @router.post("/graphics-featured-run/{run_id}")
 def set_graphics_featured_run(run_id: int, session_id: int, db: Session = Depends(get_db)) -> dict:
     session = get_session(db, session_id)
-    require_graphics_or_admin(session)
+    require_graphics_or_owner(session)
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -1541,7 +1564,7 @@ def set_graphics_featured_run(run_id: int, session_id: int, db: Session = Depend
 @router.post("/graphics-featured-run/clear")
 def clear_graphics_featured_run(session_id: int, db: Session = Depends(get_db)) -> dict:
     session = get_session(db, session_id)
-    require_graphics_or_admin(session)
+    require_graphics_or_owner(session)
 
     state = db.scalar(select(CurrentEventState).where(CurrentEventState.event_id == session.event_id))
     old_run_id = state.graphics_featured_run_id if state else None
@@ -2109,10 +2132,11 @@ def result_summary(session_id: int, db: Session = Depends(get_db)) -> dict:
     for entry in submitted_entries:
         entries_by_run.setdefault(entry.run_id, []).append(entry)
 
+    scoreboard = competitor_scoreboard(db, session.event_id, settings.result_mode, settings.score_aggregation_mode)
     rows = []
     for run in runs:
         entries = entries_by_run.get(run.id, [])
-        total = sum(float(entry.total or 0) for entry in entries)
+        run_score = scoreboard.get("by_run_id", {}).get(run.id, {})
         adjusted_entries = [
             entry
             for entry in entries
@@ -2128,7 +2152,7 @@ def result_summary(session_id: int, db: Session = Depends(get_db)) -> dict:
                 "run_type": run.run_type,
                 "state": run.state,
                 "submitted_scores": len(entries),
-                "total": total,
+                "total": run_score.get("run_total"),
                 "has_adjustments": bool(adjusted_entries),
                 "adjustment_notes": [
                     entry.reason or f"{(entry.source_type or 'adjusted').replace('_', ' ')} entry #{entry.id}"
@@ -2143,13 +2167,14 @@ def result_summary(session_id: int, db: Session = Depends(get_db)) -> dict:
     existing_heats = sorted({row["heat_number"] or 1 for row in rows})
     next_heat = max(existing_heats + [current_heat]) + 1 if existing_heats or current_heat else 2
     heat_list = sorted(set(existing_heats + [current_heat, next_heat]))
-    scoreboard = competitor_scoreboard(db, session.event_id, settings.result_mode)
     return {
         "results": rows,
         "current_heat": current_heat,
         "heats": heat_list,
         "result_mode": scoreboard["result_mode"],
         "result_mode_label": scoreboard["result_mode_label"],
+        "score_aggregation_mode": scoreboard["score_aggregation_mode"],
+        "score_aggregation_label": scoreboard["score_aggregation_label"],
         "overall_results": scoreboard["competitors"],
     }
 

@@ -17,11 +17,14 @@
           </div>
           <div id="delay" class="muted">Loading delay status</div>
         </div>
-        <a class="btn" href="/" data-help="Return to the landing page and PIN login.">Home</a>
+        <a class="btn" href="/" data-help="Return to the landing page and PIN login.">Landing Page</a>
       </div>
       <section id="queue-health" class="card danger-zone queue-health" style="display:none;">
         <strong>Display may be stale.</strong>
         <p id="queue-health-text" class="muted">Waiting for the next successful update.</p>
+      </section>
+      <section id="queue-notice-card" class="card queue-notice" style="display:none;">
+        <p id="queue-notice-text" class="muted"></p>
       </section>
       <div class="queue-meta">
         <span id="queue-updated" class="muted">Waiting for first update.</span>
@@ -74,7 +77,9 @@
         if (!state.settings?.show_public_total_scores) return "";
         const total = run?.score?.competitor_total;
         if (total === null || total === undefined) return "";
-        const label = run.score?.result_mode_label || state.settings?.result_mode_label || "Total";
+        const heatLabel = run.score?.result_mode_label || state.settings?.result_mode_label || "Total";
+        const aggregate = run.score?.score_aggregation_label || state.settings?.score_aggregation_label || "";
+        const label = aggregate && aggregate !== "Add all judge totals" ? `${heatLabel} / ${aggregate}` : heatLabel;
         return `<span class="queue-score-line">${label}: ${Number(total).toFixed(1)}</span>`;
       }
 
@@ -90,6 +95,9 @@
           document.getElementById("delay").textContent = state.delay
             ? `${state.delay.message}${state.delay.countdown_text ? " - " + state.delay.countdown_text : ""}`
             : "No active delay";
+          const notice = String(state.settings?.queue_notice || "").trim();
+          document.getElementById("queue-notice-card").style.display = notice ? "block" : "none";
+          document.getElementById("queue-notice-text").textContent = notice;
           document.getElementById("event-state").innerHTML = `
             <h2>Event State</h2>
             <div class="queue-state-lines">

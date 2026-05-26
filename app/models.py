@@ -43,6 +43,7 @@ class EventSettings(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), unique=True)
     result_mode: Mapped[str] = mapped_column(String(40), default="total_of_all_runs")
+    score_aggregation_mode: Mapped[str] = mapped_column(String(40), default="sum_all_judges")
     public_delay_seconds: Mapped[int] = mapped_column(Integer, default=5)
     show_public_total_scores: Mapped[bool] = mapped_column(Boolean, default=False)
     show_graphics_total_scores: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -50,6 +51,8 @@ class EventSettings(TimestampMixin, Base):
     allow_submit_with_nulls: Mapped[bool] = mapped_column(Boolean, default=True)
     max_judges: Mapped[int] = mapped_column(Integer, default=20)
     landing_notice: Mapped[str | None] = mapped_column(Text)
+    queue_notice: Mapped[str | None] = mapped_column(Text)
+    public_notice: Mapped[str | None] = mapped_column(Text)
     connectivity_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     delay_presets: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
 

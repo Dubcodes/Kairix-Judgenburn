@@ -43,6 +43,14 @@ Default local URLs:
 - Public display: `http://localhost:7080/public`
 - Recovery page: `http://localhost:7080/recovery`
 
+Optional isolated public display container:
+
+```bash
+docker compose --profile public up -d public
+```
+
+That serves only the public display and queue pages on `http://localhost:7081/`, proxying the safe `/api/public/snapshot` from the main app. For a cloud-hosted public display, deploy the same image with the command `uvicorn app.public_app:app --host 0.0.0.0 --port 8080 --proxy-headers` and set `PUBLIC_UPSTREAM_URL` to the main judging server URL.
+
 ## Share To Another Device
 
 On the same network, use the host computer's LAN IP instead of `localhost`.
@@ -108,6 +116,8 @@ The run scripts create `.env` from `.env.example` if it does not exist.
 Public pages use `/api/public/snapshot`, a cached read-only snapshot that strips internal IDs, judge data, device data, plates, engine details, sponsor fields, admin graphics config, and score breakdowns. Public score totals are only included when the owner/high-admin setting allows them.
 
 Internal admin, judging, scoring, and OBS pages still use the richer live event state where they need it.
+
+The optional `public` container does not connect to PostgreSQL or expose admin/judge routes. It serves the public display files and proxies only `/api/public/snapshot` from `PUBLIC_UPSTREAM_URL`.
 
 ## Version
 

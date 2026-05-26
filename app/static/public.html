@@ -38,6 +38,11 @@
         <p id="public-health-text" class="muted">Waiting for the next successful update.</p>
       </section>
 
+      <section id="public-notice-card" class="public-notice" style="display:none;">
+        <strong>Event Notice</strong>
+        <p id="public-notice-text"></p>
+      </section>
+
       <section id="public-view" class="public-view-shell"></section>
     </main>
 
@@ -88,6 +93,12 @@
         if (total === null || total === undefined) return "";
         const label = run.score?.result_mode_label || latestState.settings?.result_mode_label || "Total";
         return `<div class="public-score-line">${escapeHtml(label)}: ${Number(total).toFixed(1)}</div>`;
+      }
+
+      function scoringLabel() {
+        const heat = latestState?.settings?.result_mode_label || "All heats";
+        const aggregate = latestState?.settings?.score_aggregation_label || "Add all judge totals";
+        return aggregate === "Add all judge totals" ? heat : `${heat} / ${aggregate}`;
       }
 
       function runMeta(run) {
@@ -212,7 +223,7 @@
           <section class="public-panel ${compact ? "compact-panel" : ""}">
             <div class="public-panel-head">
               <h2>Leaderboard</h2>
-              <span class="status-pill">${escapeHtml(latestState?.settings?.result_mode_label || "All heats")}</span>
+              <span class="status-pill">${escapeHtml(scoringLabel())}</span>
             </div>
             <div class="public-table">
               ${rows.length ? rows.map(row => `
@@ -290,6 +301,9 @@
         const event = latestState.event || {};
         document.getElementById("public-event-name").textContent = event.name || "Public Display";
         document.getElementById("public-event-meta").textContent = [event.venue, event.event_date].filter(Boolean).join(" / ") || "Live event";
+        const notice = String(latestState.settings?.public_notice || "").trim();
+        document.getElementById("public-notice-card").style.display = notice ? "grid" : "none";
+        document.getElementById("public-notice-text").textContent = notice;
         shell.innerHTML = {
           venue: renderVenue,
           current: renderCurrent,
