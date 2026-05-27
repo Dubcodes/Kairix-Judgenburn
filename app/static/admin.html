@@ -334,8 +334,8 @@
         <div class="card section-gap-md">
           <div class="section-head compact-section-head">
             <div>
-              <h2>Heat Total Scoring</h2>
-              <p class="muted">Owner controlled. High admin can see how totals are being calculated.</p>
+              <h2>Event Scoring System</h2>
+              <p class="muted">Owner controlled. This is where the event scoring math is set: which heats count, and how judge totals combine.</p>
             </div>
             <span id="settings-scoring-owner-note" class="status-pill">Owner editable</span>
           </div>
@@ -351,20 +351,16 @@
                 <h3>Which heats count</h3>
                 <div class="settings-option-list">
                   <label class="settings-option-card">
-                    <input type="radio" name="settings-result-mode-choice" value="total_of_all_runs" data-owner-setting>
+                    <input type="radio" name="settings-heat-count-mode-choice" value="all" data-owner-setting>
                     <span><strong>All heats</strong><em>Every completed heat contributes to the competitor total.</em></span>
                   </label>
                   <label class="settings-option-card">
-                    <input type="radio" name="settings-result-mode-choice" value="best_1_heat" data-owner-setting>
-                    <span><strong>Best 1 heat</strong><em>Only the competitor's highest heat total is counted.</em></span>
-                  </label>
-                  <label class="settings-option-card">
-                    <input type="radio" name="settings-result-mode-choice" value="best_2_heats" data-owner-setting>
-                    <span><strong>Best 2 heats</strong><em>Useful for three-heat events where the lowest heat is dropped.</em></span>
-                  </label>
-                  <label class="settings-option-card">
-                    <input type="radio" name="settings-result-mode-choice" value="best_3_heats" data-owner-setting>
-                    <span><strong>Best 3 heats</strong><em>Counts the best three heats when extra rounds exist.</em></span>
+                    <input type="radio" name="settings-heat-count-mode-choice" value="best" data-owner-setting>
+                    <span>
+                      <strong>Best heats only</strong>
+                      <em>Count the competitor's best heat scores and drop the rest.</em>
+                      <span class="inline-number-control">Count best <input id="settings-best-heat-count" type="number" min="1" max="50" value="2" data-owner-setting> heats</span>
+                    </span>
                   </label>
                 </div>
               </div>
@@ -380,6 +376,14 @@
                     <span><strong>Average judge totals</strong><em>Keeps totals comparable if the number of judges changes.</em></span>
                   </label>
                   <label class="settings-option-card">
+                    <input type="radio" name="settings-score-aggregation-choice" value="median_judge_score" data-owner-setting>
+                    <span><strong>Median judge total</strong><em>Uses the middle judge score, reducing the impact of one unusual score.</em></span>
+                  </label>
+                  <label class="settings-option-card">
+                    <input type="radio" name="settings-score-aggregation-choice" value="drop_high_low_average" data-owner-setting>
+                    <span><strong>Drop high/low, average rest</strong><em>Drops the highest and lowest judge totals when three or more judges submit.</em></span>
+                  </label>
+                  <label class="settings-option-card">
                     <input type="radio" name="settings-score-aggregation-choice" value="normalized_100" data-owner-setting>
                     <span><strong>Normalize each heat to 100</strong><em>Averages judge totals, then scales against the configured criteria maximum.</em></span>
                   </label>
@@ -389,6 +393,7 @@
             <div class="notice section-gap-sm">
               <strong>Example</strong>
               <p id="settings-scoring-example" class="muted">All heats adds every heat total together. Add all judge totals means two 80-point judge scores become 160 for that heat.</p>
+              <p class="muted">Working example: if a competitor scores Heat 1 = 160, Heat 2 = 145, Heat 3 = 90 and the mode is Best 2 heats, the event total is 305. If the mode is All heats, the event total is 395. If more heats are added later, Best heats still uses the best number chosen here.</p>
             </div>
           </details>
         </div>
@@ -561,6 +566,27 @@
           </div>
           <pre id="connectivity-result" class="muted"></pre>
         </div>
+        <div class="card section-gap-md">
+          <h2>Public Display</h2>
+          <p class="muted">Owner controls for the separate public display service and the logo shown on queue and public pages.</p>
+          <div class="grid">
+            <label>Public service URL
+              <input id="public-display-service-url" type="url" placeholder="http://localhost:7081">
+            </label>
+            <label>Public logo URL
+              <input id="public-display-logo-url" placeholder="/static/kairix-judging-system-logo.png">
+            </label>
+            <label>Display heading
+              <input id="public-display-heading" placeholder="Leave blank to use the event name">
+            </label>
+          </div>
+          <p class="notice">For a standalone public container in Portainer, point its `PUBLIC_UPSTREAM_URL` at the main Judgenburn server. This page only serves the safe public snapshot.</p>
+          <div class="btn-row section-gap-sm">
+            <button id="save-public-display" class="btn primary" data-help="Owner only: save the public display URL, heading, and logo used by public-facing pages.">Save Public Display</button>
+            <button id="refresh-public-display" class="btn" data-help="Reload public display settings from the server.">Refresh Public Display</button>
+          </div>
+          <pre id="public-display-result" class="muted"></pre>
+        </div>
         <div class="card danger-zone">
           <h2>Owner Tools</h2>
           <p class="muted">Dangerous actions live here. Backup before clearing anything.</p>
@@ -577,7 +603,6 @@
       <section id="panel-database" class="panel">
         <div class="card danger-zone">
           <h2>Database</h2>
-          <p class="muted">Owner-only inspection and cleanup tools. These are for fixing event-day data state, not normal judging flow.</p>
           <div class="btn-row">
             <button id="refresh-db" class="btn primary" data-help="Reload row counts for each managed database table. This does not change data.">Refresh Counts</button>
             <button id="cleanup-scoring" class="btn" data-help="Clears any old accidental 'scoring' states on non-current runs. It does not delete competitors or runs.">Clear Scoring State</button>
@@ -638,13 +663,12 @@
       ];
       const RESULT_MODE_DETAILS = {
         total_of_all_runs: { label: "All heats", example: "All heats adds every completed heat total together." },
-        best_1_heat: { label: "Best 1 heat", example: "Best 1 keeps only the competitor's highest heat total." },
-        best_2_heats: { label: "Best 2 heats", example: "Best 2 keeps the two highest heat totals, which suits a three-heat event with a dropped worst heat." },
-        best_3_heats: { label: "Best 3 heats", example: "Best 3 keeps the best three heat totals if the event has extra rounds." },
       };
       const SCORE_AGGREGATION_DETAILS = {
         sum_all_judges: { label: "Add all judge totals", example: "Two 80-point judge scores become 160 for that heat." },
         average_judge_score: { label: "Average judge totals", example: "Two judge scores of 80 and 70 become 75 for that heat." },
+        median_judge_score: { label: "Median judge total", example: "Judge totals of 70, 80, and 95 become 80 for that heat." },
+        drop_high_low_average: { label: "Drop high/low, average rest", example: "Judge totals of 70, 80, 85, 95 drop 70 and 95, then average 80 and 85 = 82.5." },
         normalized_100: { label: "Normalize each heat to 100", example: "The average judge score is scaled against the criteria maximum so each heat is out of 100." },
       };
       const DEFAULT_DELAY_PRESETS = adminState.delayPresets.map(item => ({ ...item }));
@@ -685,14 +709,46 @@
         });
       }
 
+      function bestHeatCountFromMode(mode) {
+        const match = String(mode || "").match(/^best_(\d+)_heats?$/);
+        return match ? Math.max(1, Math.min(50, Number(match[1]) || 1)) : null;
+      }
+
+      function resultModeFromControls() {
+        const countMode = selectedRadioValue("settings-heat-count-mode-choice", "all");
+        if (countMode !== "best") return "total_of_all_runs";
+        const count = Math.max(1, Math.min(50, Number(document.getElementById("settings-best-heat-count").value || 1)));
+        return count === 1 ? "best_1_heat" : `best_${count}_heats`;
+      }
+
+      function hydrateResultModeControls(mode) {
+        const bestCount = bestHeatCountFromMode(mode);
+        setRadioValue("settings-heat-count-mode-choice", bestCount ? "best" : "all", "all");
+        if (bestCount) {
+          document.getElementById("settings-best-heat-count").value = bestCount;
+        }
+      }
+
+      function resultModeDetail(mode) {
+        const bestCount = bestHeatCountFromMode(mode);
+        if (bestCount) {
+          const noun = bestCount === 1 ? "heat" : "heats";
+          return {
+            label: `Best ${bestCount} ${noun}`,
+            example: `Best ${bestCount} keeps only the competitor's top ${bestCount} heat score${bestCount === 1 ? "" : "s"} and drops the rest.`,
+          };
+        }
+        return RESULT_MODE_DETAILS.total_of_all_runs;
+      }
+
       function updateScoringModeSummary(config = {}) {
-        const resultMode = config.result_mode || document.getElementById("settings-result-mode").value || "total_of_all_runs";
+        const resultMode = config.result_mode || resultModeFromControls();
         const aggregationMode = config.score_aggregation_mode || document.getElementById("settings-score-aggregation-mode").value || "sum_all_judges";
         document.getElementById("settings-result-mode").value = resultMode;
         document.getElementById("settings-score-aggregation-mode").value = aggregationMode;
-        setRadioValue("settings-result-mode-choice", resultMode, "total_of_all_runs");
+        hydrateResultModeControls(resultMode);
         setRadioValue("settings-score-aggregation-choice", aggregationMode, "sum_all_judges");
-        const resultDetail = RESULT_MODE_DETAILS[resultMode] || RESULT_MODE_DETAILS.total_of_all_runs;
+        const resultDetail = resultModeDetail(resultMode);
         const aggregationDetail = SCORE_AGGREGATION_DETAILS[aggregationMode] || SCORE_AGGREGATION_DETAILS.sum_all_judges;
         document.getElementById("settings-scoring-summary").textContent = `${resultDetail.label} - ${aggregationDetail.label}`;
         document.getElementById("settings-scoring-example").textContent = `${resultDetail.example} ${aggregationDetail.example}`;
@@ -2213,12 +2269,17 @@
         refreshCriteria();
       });
 
-      document.querySelectorAll("input[name='settings-result-mode-choice'], input[name='settings-score-aggregation-choice']").forEach(input => {
+      document.querySelectorAll("input[name='settings-heat-count-mode-choice'], input[name='settings-score-aggregation-choice']").forEach(input => {
         input.addEventListener("change", () => {
-          document.getElementById("settings-result-mode").value = selectedRadioValue("settings-result-mode-choice", "total_of_all_runs");
+          document.getElementById("settings-result-mode").value = resultModeFromControls();
           document.getElementById("settings-score-aggregation-mode").value = selectedRadioValue("settings-score-aggregation-choice", "sum_all_judges");
           updateScoringModeSummary();
         });
+      });
+      document.getElementById("settings-best-heat-count").addEventListener("input", () => {
+        setRadioValue("settings-heat-count-mode-choice", "best", "all");
+        document.getElementById("settings-result-mode").value = resultModeFromControls();
+        updateScoringModeSummary();
       });
 
       document.getElementById("save-settings").addEventListener("click", async event => {
@@ -2334,6 +2395,7 @@
                   ${["competition", "demo", "fun", "exhibition", "test"].map(type => `<option value="${type}" ${row.run_type === type ? "selected" : ""}>${type}</option>`).join("")}
                 </select>
               </label>
+              <label>Heat <input data-import-field="heat_number" type="number" min="1" value="${Number(row.heat_number || 1)}"></label>
             </div>
             <label style="margin-top:8px;">Issues / notes <textarea data-import-field="notes">${escapeHtml(row.notes || "")}</textarea></label>
             ${row.raw_source ? `<p class="muted">Raw: ${escapeHtml(row.raw_source)}</p>` : ""}
@@ -2387,6 +2449,7 @@
             sponsor: cleanText(valueOf("sponsor").value),
             notes: cleanText(valueOf("notes").value),
             run_type: valueOf("run_type").value || "competition",
+            heat_number: Math.max(1, Number(valueOf("heat_number").value || 1)),
             skip,
           };
         }).filter(row => includeSkipped || !row.skip);
@@ -2569,6 +2632,36 @@
       }));
       document.getElementById("test-local-connection").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, () => testConnection("local")));
       document.getElementById("test-cloud-connection").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, () => testConnection("cloud")));
+
+      function hydratePublicDisplayControls(config = {}) {
+        document.getElementById("public-display-service-url").value = config.service_url || "";
+        document.getElementById("public-display-logo-url").value = config.logo_url || "/static/kairix-judging-system-logo.png";
+        document.getElementById("public-display-heading").value = config.heading || "";
+      }
+
+      function publicDisplayFromControls() {
+        return {
+          session_id: adminState.session.session_id,
+          service_url: document.getElementById("public-display-service-url").value.trim(),
+          logo_url: document.getElementById("public-display-logo-url").value.trim(),
+          heading: document.getElementById("public-display-heading").value.trim(),
+        };
+      }
+
+      async function refreshPublicDisplaySettings() {
+        if (adminState.session.role !== "owner") return;
+        const data = await Kairix.API.get(`/api/admin/public-display?session_id=${adminState.session.session_id}`);
+        hydratePublicDisplayControls(data.public_display || {});
+        const serviceUrl = data.public_display?.service_url || "not set";
+        document.getElementById("public-display-result").textContent = `Loaded public display settings.\nPublic service URL: ${serviceUrl}`;
+      }
+
+      document.getElementById("save-public-display").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, async () => {
+        const data = await Kairix.API.put("/api/admin/public-display", publicDisplayFromControls());
+        hydratePublicDisplayControls(data.public_display || {});
+        document.getElementById("public-display-result").textContent = "Public display settings saved.";
+      }));
+      document.getElementById("refresh-public-display").addEventListener("click", event => Kairix.withButtonFeedback(event.currentTarget, refreshPublicDisplaySettings));
 
       function formatBackupAge(seconds) {
         if (seconds == null) return "No backup yet";
@@ -2769,11 +2862,21 @@
         }
       }
 
+      async function guardedRefreshPublicDisplaySettings() {
+        try {
+          await refreshPublicDisplaySettings();
+        } catch (error) {
+          if (handleSessionError(error)) return;
+          console.error(error);
+        }
+      }
+
       guardedRefresh();
       guardedRefreshDbSummary();
       guardedRefreshBackupHealth();
       guardedRefreshRecoveryReview();
       guardedRefreshConnectivitySettings();
+      guardedRefreshPublicDisplaySettings();
       setInterval(renderTimerReadout, 1000);
       setInterval(renderAdminDelayReadout, 1000);
       setInterval(() => renderRunHeatControl(adminState.latestEventState), 1000);

@@ -12,7 +12,7 @@
       <div class="topline">
         <div class="brand-block">
           <div class="brand-row">
-            <img class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
+            <img id="queue-logo" class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
             <div class="brand">Competitor Queue</div>
           </div>
           <div id="delay" class="muted">Loading delay status</div>
@@ -83,12 +83,19 @@
         return `<span class="queue-score-line">${label}: ${Number(total).toFixed(1)}</span>`;
       }
 
+      function applyPublicLogo(state) {
+        const logo = document.getElementById("queue-logo");
+        const nextLogo = String(state.settings?.public_display?.logo_url || "/static/kairix-judging-system-logo.png").trim();
+        if (nextLogo && logo.getAttribute("src") !== nextLogo) logo.setAttribute("src", nextLogo);
+      }
+
       async function refresh(liveState = null) {
         try {
           const state = liveState || await Kairix.API.get("/api/public/snapshot");
           latestTimer = state.timer ? Kairix.stampTimer(state.timer) : null;
           lastSuccessAt = Date.now();
           lastFailureReason = "";
+          applyPublicLogo(state);
           document.getElementById("queue-event").textContent = state.event?.name || "Live event";
           document.getElementById("queue-event").className = "status-pill good-pill";
           renderTimer();

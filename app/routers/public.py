@@ -49,6 +49,12 @@ DEFAULT_CONNECTIVITY = {
     "health_path": "/api/health",
 }
 
+DEFAULT_PUBLIC_DISPLAY = {
+    "service_url": "",
+    "logo_url": "/static/kairix-judging-system-logo.png",
+    "heading": "",
+}
+
 PUBLIC_SNAPSHOT_TTL_SECONDS = 1.5
 PUBLIC_QUEUE_LIMIT = 60
 PUBLIC_NEXT_LIMIT = 10
@@ -70,6 +76,16 @@ def connectivity_payload(settings: EventSettings | None) -> dict:
     config["request_timeout_ms"] = max(500, min(15000, int(config.get("request_timeout_ms") or 2500)))
     config["retry_local_after_seconds"] = max(5, min(600, int(config.get("retry_local_after_seconds") or 20)))
     config["health_path"] = str(config.get("health_path") or "/api/health")
+    return config
+
+
+def public_display_payload(settings: EventSettings | None) -> dict:
+    config = dict(DEFAULT_PUBLIC_DISPLAY)
+    if settings and isinstance(settings.public_display_config, dict):
+        config.update({key: value for key, value in settings.public_display_config.items() if key in config})
+    config["service_url"] = str(config.get("service_url") or "").strip()
+    config["logo_url"] = str(config.get("logo_url") or DEFAULT_PUBLIC_DISPLAY["logo_url"]).strip() or DEFAULT_PUBLIC_DISPLAY["logo_url"]
+    config["heading"] = str(config.get("heading") or "").strip()
     return config
 
 
@@ -396,6 +412,7 @@ def public_snapshot_payload(db: Session) -> dict:
             "show_public_total_scores": show_public_scores,
             "queue_notice": settings.queue_notice if settings else None,
             "public_notice": settings.public_notice if settings else None,
+            "public_display": public_display_payload(settings),
         },
         "status": {
             "current_heat": state.current_heat if state else 1,
@@ -465,6 +482,7 @@ def event_state_payload(db: Session) -> dict:
             "public_notice": settings.public_notice if settings else None,
             "delay_presets": settings.delay_presets if settings and isinstance(settings.delay_presets, list) else [],
             "connectivity": connectivity_payload(settings),
+            "public_display": public_display_payload(settings),
         },
         "current_run": run_payload(current_run, scoreboard),
         "current_heat": state.current_heat if state else 1,
@@ -515,12 +533,16 @@ def get_public_snapshot(response: Response, db: Session = Depends(get_db)) -> di
 def get_client_config(db: Session = Depends(get_db)) -> dict:
     event = active_event(db)
     settings = db.scalar(select(EventSettings).where(EventSettings.event_id == event.id))
-    return {"event_id": event.id, "connectivity": connectivity_payload(settings)}
+    return {
+        "event_id": event.id,
+        "connectivity": connectivity_payload(settings),
+        "public_display": public_display_payload(settings),
+    }
 
 
 @router.get("/health")
 def health() -> dict:
-    return {"ok": True, "service": "kairix-judging", "checked_at": datetime.now(timezone.utc).isoformat()}
+    return {"ok": True, "service": "kairix-judgenburn", "checked_at": datetime.now(timezone.utc).isoformat()}
 
 
 @router.get("/live/events")
@@ -606,6 +628,7 @@ def get_queue(db: Session = Depends(get_db)) -> dict:
             "score_aggregation_label": scoreboard["score_aggregation_label"],
             "show_public_total_scores": settings.show_public_total_scores if settings else False,
             "queue_notice": settings.queue_notice if settings else None,
+            "public_display": public_display_payload(settings),
         },
     }
 

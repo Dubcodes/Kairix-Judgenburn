@@ -14,7 +14,7 @@ from app.services.backups import start_backup_scheduler
 from app.version import APP_VERSION
 
 
-app = FastAPI(title="Kairix Judgenburn System", version=APP_VERSION)
+app = FastAPI(title="Kairix Judgenburn", version=APP_VERSION)
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,6 +53,7 @@ def ensure_schema_upgrades() -> None:
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS public_notice TEXT"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS score_aggregation_mode VARCHAR(40) DEFAULT 'sum_all_judges'"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS connectivity_config JSON DEFAULT '{}'"))
+        conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS public_display_config JSON DEFAULT '{}'"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_public_total_scores BOOLEAN DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS show_graphics_total_scores BOOLEAN DEFAULT TRUE"))
         conn.execute(text("ALTER TABLE event_settings ADD COLUMN IF NOT EXISTS delay_presets JSON DEFAULT '[]'"))

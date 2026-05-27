@@ -207,6 +207,13 @@ class ConnectivitySettingsInput(BaseModel):
     health_path: str = "/api/health"
 
 
+class PublicDisplaySettingsInput(BaseModel):
+    session_id: int
+    service_url: str | None = None
+    logo_url: str | None = None
+    heading: str | None = None
+
+
 class EventLifecycleInput(BaseModel):
     session_id: int
     event_name: str

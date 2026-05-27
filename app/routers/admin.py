@@ -50,6 +50,7 @@ from app.schemas import (
     EventSettingsInput,
     GraphicsStateInput,
     PinAccountInput,
+    PublicDisplaySettingsInput,
     RecoveryImportInput,
     RunOrderInput,
     ScoreOverrideInput,
@@ -61,14 +62,14 @@ from app.services.audit import log_action
 from app.services.backups import backup_health as backup_health_snapshot
 from app.services.backups import build_backup_payload, write_backup
 from app.services.results import (
-    RESULT_MODE_LABELS,
     SCORE_AGGREGATION_LABELS,
     competitor_scoreboard,
     normalize_result_mode,
     normalize_score_aggregation_mode,
+    result_mode_label,
 )
 from app.services.scoring import calculate_points
-from app.routers.public import DEFAULT_CONNECTIVITY, connectivity_payload
+from app.routers.public import DEFAULT_CONNECTIVITY, DEFAULT_PUBLIC_DISPLAY, connectivity_payload, public_display_payload
 from app.version import APP_VERSION, SUPPORT_URL
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -220,6 +221,17 @@ def clean_base_url(value: str | None) -> str:
     if not re.match(r"^https?://", cleaned, flags=re.IGNORECASE):
         raise HTTPException(status_code=400, detail="Connection URLs must start with http:// or https://")
     return cleaned
+
+
+def clean_public_asset_url(value: str | None, fallback: str = "") -> str:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return fallback
+    if cleaned.startswith("/"):
+        return cleaned
+    if re.match(r"^https?://", cleaned, flags=re.IGNORECASE):
+        return cleaned
+    raise HTTPException(status_code=400, detail="Public display URLs must start with /, http://, or https://")
 
 
 def graphics_state_record(db: Session, event_id: int) -> GraphicsState:
@@ -980,7 +992,7 @@ def get_admin_settings(session_id: int, db: Session = Depends(get_db)) -> dict:
         },
         "settings": {
             "result_mode": normalize_result_mode(settings.result_mode),
-            "result_mode_label": RESULT_MODE_LABELS.get(normalize_result_mode(settings.result_mode), "All heats"),
+            "result_mode_label": result_mode_label(settings.result_mode),
             "score_aggregation_mode": normalize_score_aggregation_mode(settings.score_aggregation_mode),
             "score_aggregation_label": SCORE_AGGREGATION_LABELS.get(
                 normalize_score_aggregation_mode(settings.score_aggregation_mode),
@@ -994,6 +1006,7 @@ def get_admin_settings(session_id: int, db: Session = Depends(get_db)) -> dict:
             "queue_notice": settings.queue_notice,
             "public_notice": settings.public_notice,
             "delay_presets": normalize_delay_presets(settings.delay_presets),
+            "public_display": public_display_payload(settings),
         },
         "theme": (graphics.layout_config or {}).get("theme") or {},
     }
@@ -1071,7 +1084,7 @@ def update_result_mode(result_mode: str, session_id: int, db: Session = Depends(
     return {
         "ok": True,
         "result_mode": settings.result_mode,
-        "result_mode_label": RESULT_MODE_LABELS[settings.result_mode],
+        "result_mode_label": result_mode_label(settings.result_mode),
     }
 
 
@@ -1119,6 +1132,42 @@ def update_connectivity_settings(payload: ConnectivitySettingsInput, db: Session
     )
     db.commit()
     return {"ok": True, "connectivity": config}
+
+
+@router.get("/public-display")
+def get_public_display_settings(session_id: int, db: Session = Depends(get_db)) -> dict:
+    session = get_session(db, session_id)
+    require_owner(session)
+    event = active_event(db)
+    settings = event_settings_record(db, event.id)
+    return {"ok": True, "public_display": public_display_payload(settings)}
+
+
+@router.put("/public-display")
+def update_public_display_settings(payload: PublicDisplaySettingsInput, db: Session = Depends(get_db)) -> dict:
+    session = get_session(db, payload.session_id)
+    require_owner(session)
+    event = active_event(db)
+    settings = event_settings_record(db, event.id)
+    old = public_display_payload(settings)
+    config = {
+        "service_url": clean_base_url(payload.service_url),
+        "logo_url": clean_public_asset_url(payload.logo_url, DEFAULT_PUBLIC_DISPLAY["logo_url"]),
+        "heading": (payload.heading or "").strip(),
+    }
+    settings.public_display_config = config
+    log_action(
+        db,
+        event_id=event.id,
+        actor_pin_account_id=session.pin_account_id,
+        device_id=session.device_id,
+        action_type="public_display_settings_updated",
+        entity_type="event_settings",
+        entity_id=settings.id,
+        details={"old": old, "new": config},
+    )
+    db.commit()
+    return {"ok": True, "public_display": config}
 
 
 @router.get("/sessions/active")
@@ -1302,6 +1351,7 @@ def archive_and_create_event(payload: EventLifecycleInput, db: Session = Depends
             queue_notice=current_settings.queue_notice if payload.copy_notice else None,
             public_notice=current_settings.public_notice if payload.copy_notice else None,
             connectivity_config=clone_json(current_settings.connectivity_config or {}),
+            public_display_config=clone_json(current_settings.public_display_config or {}),
             delay_presets=clone_json(current_settings.delay_presets or []),
         )
     )
@@ -2552,6 +2602,8 @@ KNOWN_IMPORT_HEADERS = {
         "sponsor",
         "notes",
         "run type",
+        "heat",
+        "heat number",
         "raw source",
     }
 }
@@ -2686,6 +2738,11 @@ def build_import_preview(rows: list[dict[str, str]]) -> list[dict]:
         if pick(row, "needs review").lower() in {"yes", "true", "1"}:
             review_note = pick(row, "review notes")
             warnings.append(f"source parser warning{': ' + review_note if review_note else ''}")
+        try:
+            heat_number = max(1, int(float(pick(row, "heat number", "heat") or 1)))
+        except ValueError:
+            heat_number = 1
+            warnings.append("invalid heat number; using Heat 1")
         notes = issues + warnings
 
         preview.append(
@@ -2701,6 +2758,7 @@ def build_import_preview(rows: list[dict[str, str]]) -> list[dict]:
                 "sponsor": pick(row, "sponsor", "sponsors"),
                 "notes": "; ".join(notes),
                 "run_type": pick(row, "run type", "type") or "competition",
+                "heat_number": heat_number,
                 "skip": False if entry_number or driver_name or car_name or vehicle else True,
                 "needs_review": bool(issues),
                 "has_warnings": bool(warnings),
@@ -2764,6 +2822,7 @@ def annotate_import_preview(db: Session, event_id: int, preview: list[dict]) -> 
             "engine": vehicle.engine if vehicle else "",
             "plate": vehicle.plate if vehicle else "",
             "run_type": run.run_type if run else "",
+            "heat_number": run.heat_number if run else None,
             "queue_position": run.queue_position if run else None,
         }
         row["existing"] = existing
@@ -2775,6 +2834,7 @@ def annotate_import_preview(db: Session, event_id: int, preview: list[dict]) -> 
             ("engine", "Engine"),
             ("plate", "Plate"),
             ("run_type", "Run type"),
+            ("heat_number", "Heat"),
         ]
         differences = []
         for field, label in comparisons:

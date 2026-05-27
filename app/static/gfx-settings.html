@@ -489,7 +489,7 @@
                 window.location.href = "/";
                 return;
               }
-              document.getElementById("who").textContent = `${session.display_name} / ${session.role}`;
+              document.getElementById("who").textContent = session.display_name || session.role;
               if (session.role === "graphics") {
                 document.querySelectorAll(".high-admin-link").forEach(item => item.style.display = "none");
               }

@@ -77,7 +77,7 @@
       const gfxSession = Kairix.requireRole(["graphics", "owner"]);
       Kairix.validateSession(gfxSession, ["graphics", "owner"]).catch(() => {});
       const roleDisplay = role => ({ owner: "Owner", graphics: "Graphics" }[role] || role);
-      document.getElementById("who").textContent = `${gfxSession.display_name} / ${roleDisplay(gfxSession.role)}`;
+      document.getElementById("who").textContent = gfxSession.display_name || roleDisplay(gfxSession.role);
       if (gfxSession.role === "graphics") {
         document.querySelectorAll(".high-admin-link").forEach(item => item.style.display = "none");
       }

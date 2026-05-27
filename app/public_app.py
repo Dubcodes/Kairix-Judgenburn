@@ -15,7 +15,7 @@ PUBLIC_UPSTREAM_URL = os.getenv("PUBLIC_UPSTREAM_URL", "").rstrip("/")
 PUBLIC_PROXY_TIMEOUT_SECONDS = float(os.getenv("PUBLIC_PROXY_TIMEOUT_SECONDS", "4"))
 MAX_PUBLIC_RESPONSE_BYTES = 2 * 1024 * 1024
 
-app = FastAPI(title="Kairix Public Display", version=APP_VERSION)
+app = FastAPI(title="Judgenburn Public Display", version=APP_VERSION)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
@@ -67,7 +67,7 @@ def public_snapshot() -> JSONResponse:
 def public_health() -> dict:
     return {
         "ok": True,
-        "service": "kairix-public-display",
+        "service": "judgenburn-public-display",
         "upstream_configured": bool(PUBLIC_UPSTREAM_URL),
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }

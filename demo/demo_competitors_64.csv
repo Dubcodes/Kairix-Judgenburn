@@ -1,0 +1,65 @@
+entry_number,driver_name,class_name,car_name,engine,plate,sponsor,notes,run_type,heat_number,queue_position
+1,BOK CHOI (MATTY),Open,MADFD,LS turbo V8,MADFD,Kairix Demo Team,Existing demo entry with adjusted scoring history,competition,1,1
+2,LOGAN BOYLE,Pro,STARIO,2JZ turbo,STARIO,Stario Fabrication,Current-run style demo competitor,competition,1,2
+3,OSHANA SOLAKA,Street,BUMPIT,RB25DET,BUMPIT,Southside Tyres,Good sample for score recovery demos,competition,1,3
+4,DICK TOOMER,Open,L200,4G63 turbo,L200,Toomer Towing,Older ute build with mixed judge scores,competition,1,4
+5,KEATON HESTER,Pro,ROYLTY,Supercharged LS,ROYLTY,Royalty Garage,High-power pro class car,competition,1,5
+6,URIAH OPAE PAPENE,Open,SYCOBF,Barra turbo,SYCOBF,Papene Performance,Submitted-score demo entry,competition,1,6
+7,ONDRE,Pro,MISJIF,LSA supercharged,MISJIF,Misjif Motorsport,Short driver name display check,competition,1,7
+8,DOUG GRIFFITHS,Street,WEOUTZ,Holden 355 stroker,WEOUTZ,Griffiths Contracting,Street class smoke build,competition,1,8
+9,PAUL FLEET,Open,RDY4WAR,LS turbo,RDY4WAR,Fleet Auto,Queue-order display sample,competition,1,9
+10,CORBAN TEKANI,Pro,FKCOPS,Big block Chev,FKCOPS,Tekani Racing,Up-next display sample,competition,1,10
+11,KARL PIECE,Street,FRYTYM,Barra NA,FRYTYM,Frytyme Garage,Low-budget street class,competition,1,11
+12,MICHAEL SMITH,Open,BAUWHAT,LS1,BAUWHAT,Smith Fabrication,Common-name search sample,competition,1,12
+13,TONI WEBBER,Street,Vehicle TBC,TBC,TBC,Privateer,Vehicle still to be confirmed,competition,1,13
+14,AVA MORGAN,Ladies,SKIDHER,LS2,SKIDHR,Chrome Rose Racing,Ladies class example,competition,1,14
+15,JAX RANGI,Junior,MINISMK,SR20DET,MINSMK,Rangi Motors,Junior class example,competition,1,15
+16,MEREANA KING,Open,KINGHIT,Barra turbo,KNGHIT,King Haulage,Longer first name display check,competition,1,16
+17,TYLER BURNS,Pro,FIREUP,427 LSX,FIREUP,Burns Performance,High-score contender example,competition,1,17
+18,CHARLIE NGATA,Street,OLDM8,Holden 304,OLDM8,Ngata Panelworks,Classic Commodore street car,competition,1,18
+19,HANA WILSON,Ladies,PNKSMK,LS1,PNKSMK,Wilson Civil,Ladies class with sponsor,competition,1,19
+20,REUBEN HART,Open,HRTBRK,1UZ turbo,HRTBRK,Hart Raceworks,Non-Holden engine example,competition,1,20
+21,CALEB TAYLOR,Street,NOCTRL,RB30 turbo,NOCTRL,Taylor Tuning,Penalty/tap scoring demo candidate,competition,1,21
+22,SIENNA PARK,Ladies,DRFTQT,13B turbo,DRFTQT,Park Rotary,Rotary example,competition,1,22
+23,MANAIA BROWN,Open,SMKCHK,LS turbo,SMKCHK,Brown Earthworks,Consistent smoke demo,competition,1,23
+24,ELI CARTER,Pro,TYRFRY,Supercharged LS,TYRFRY,Carter Motorsport,Tyre burst bonus demo,competition,1,24
+25,NOAH WARD,Street,BUDGET,Ecotec turbo,BUDGET,Ward Autos,Budget class-style entry,competition,1,25
+26,LILY HARRIS,Ladies,QUEENB,Barra turbo,QUEENB,Harris Haulage,Ladies class pro build,competition,1,26
+27,MAKO THOMAS,Open,THRASH,LS3,THRSH,Thomas Tyres,Short plate display check,competition,1,27
+28,ISAAC EVANS,Pro,EVILVN,Big block Chev,EVILVN,Evans Engines,High-power pro example,competition,1,28
+29,AMELIA ROBERTS,Street,SMKBOX,Holden 308,SMKBOX,Roberts Rural,Older carb setup example,competition,1,29
+30,TAMA WILLIAMS,Open,TAKOFF,2JZ turbo,TAKOFF,Williams Welding,Import engine burnout build,competition,1,30
+31,ZOE WALKER,Ladies,BLUOUT,LS1,BLUOUT,Walker Transport,Ladies class display sample,competition,1,31
+32,LEO PATEL,Street,PATELD,RB25DET,PATELD,Patel Auto Electrical,Street turbo coupe,competition,1,32
+33,ARLO COOPER,Open,SKIDIT,LS turbo,SKIDIT,Cooper Contracting,Generic open-class sample,competition,1,33
+34,MAIA CLARKE,Ladies,SMKQEN,Barra turbo,SMKQEN,Clarke Civil,Ladies class smoke machine,competition,1,34
+35,HUNTER SCOTT,Pro,MAXRPM,427 LSX,MAXRPM,Scott Speed Shop,Pro class leaderboard sample,competition,1,35
+36,PIPER LEE,Street,LEEWAY,SR20DET,LEEWAY,Lee Automotive,Compact vehicle example,competition,1,36
+37,NIKO ANDERSON,Open,NIKOUT,LS2,NIKOUT,Anderson Motors,Open class mid-pack sample,competition,1,37
+38,GRACE MARTIN,Ladies,HERSMK,Holden 355,HERSMK,Martin Mechanical,Ladies class classic build,competition,1,38
+39,FINN ROBINSON,Street,FINISH,Barra NA,FINISH,Robinson Towing,Finished-state text sample,competition,1,39
+40,AIDEN WHITE,Open,WHITEY,LS turbo,WHITEY,White Line Fabrication,Open class queue sample,competition,1,40
+41,EMMA THOMPSON,Ladies,EMFIRE,LSA supercharged,EMFIRE,Thompson Racing,High-power ladies entry,competition,1,41
+42,JAYDEN GREEN,Street,GRNUTE,Holden 304,GRNUTE,Green Ag,Street ute display sample,competition,1,42
+43,RUBY HALL,Open,RUBURN,RB30 turbo,RUBURN,Hall Performance,Open class import six,competition,1,43
+44,OSCAR YOUNG,Pro,YNGGUN,Big block Chev,YNGGUN,Young Guns Racing,Pro class younger driver,competition,1,44
+45,ISLA ALLEN,Ladies,ISLIDE,LS1,ISLIDE,Allen Auto Body,Ladies entry with tidy plate,competition,1,45
+46,BEAU KINGI,Street,KINGI,Barra turbo,KINGI,Kingi Kustoms,Single-word plate sample,competition,1,46
+47,PHOENIX REED,Open,REBORN,13B turbo,REBORN,Reed Rotary,Rotary open-class entry,competition,1,47
+48,SOPHIE ADAMS,Ladies,ADAMSG,LS3,ADAMSG,Adams Transport,Ladies class LS build,competition,1,48
+49,HARRISON BAKER,Pro,BURNIT,Supercharged LS,BURNIT,Baker Burnouts,Pro class obvious demo name,competition,1,49
+50,MILA CAMPBELL,Street,MILASK,Ecotec turbo,MILASK,Campbell Mechanical,Street class turbo six,competition,1,50
+51,RILEY MITCHELL,Open,RILSKD,LS turbo,RILSKD,Mitchell Metals,Open class extra heat demo,competition,2,51
+52,CHLOE TURNER,Ladies,CHLOE8,Holden 308,CHLOE8,Turner Tyres,Heat 2 import example,competition,2,52
+53,MASON PHILLIPS,Street,PHILUP,RB25DET,PHILUP,Phillips Panels,Heat 2 street example,competition,2,53
+54,EVA PARKER,Open,EVAPOR,Barra turbo,EVAPOR,Parker Plumbing,Heat 2 open example,competition,2,54
+55,LUCA BENNETT,Pro,LUCIFR,427 LSX,LUCIFR,Bennett Racing,Heat 2 pro example,competition,2,55
+56,ABBY COLLINS,Ladies,ABSKID,LS1,ABSKID,Collins Cars,Heat 2 ladies example,competition,2,56
+57,HUDSON GRAY,Street,GRAYZD,Holden 304,GRAYZD,Gray Garage,Heat 3 street example,competition,3,57
+58,SKYE MORRIS,Open,SKYHI,2JZ turbo,SKYHI,Morris Motorsport,Heat 3 open example,competition,3,58
+59,THEO RUSSELL,Pro,THEORY,Big block Chev,THEORY,Russell Race Engines,Heat 3 pro example,competition,3,59
+60,ELLA FOSTER,Ladies,ELLSMK,Barra turbo,ELLSMK,Foster Fabrication,Heat 3 ladies example,competition,3,60
+61,DEMO DRIVER,Demo,SPONSOR,Stock V8,DEMO1,Event Sponsor,Demo run excluded from official competition results,demo,1,61
+62,SAFETY CREW,Demo,SAFETY,Support Vehicle,SAFE1,Venue Crew,Safety demonstration or parade lap,exhibition,1,62
+63,CHARITY RIDE,Fun,GOOD1,LS1,GOOD1,Local Charity,Fun run for crowd engagement,fun,1,63
+64,TEST COMPETITOR,Test,TESTER,TBC,TESTER,Kairix Test Row,Test run type for setup and training,test,1,64

@@ -54,6 +54,7 @@ class EventSettings(TimestampMixin, Base):
     queue_notice: Mapped[str | None] = mapped_column(Text)
     public_notice: Mapped[str | None] = mapped_column(Text)
     connectivity_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    public_display_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     delay_presets: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
 
     event: Mapped[Event] = relationship(back_populates="settings")

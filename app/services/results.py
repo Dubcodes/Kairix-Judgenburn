@@ -1,6 +1,8 @@
 from datetime import datetime
+import re
+from statistics import median
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import CriteriaSet, Criterion, Run, ScoreEntry
@@ -8,20 +10,26 @@ from app.models import CriteriaSet, Criterion, Run, ScoreEntry
 
 RESULT_MODE_LABELS = {
     "total_of_all_runs": "All heats",
-    "best_1_heat": "Best 1 heat",
-    "best_2_heats": "Best 2 heats",
-    "best_3_heats": "Best 3 heats",
 }
 
 SCORE_AGGREGATION_LABELS = {
     "sum_all_judges": "Add all judge totals",
     "average_judge_score": "Average judge totals",
+    "median_judge_score": "Median judge total",
+    "drop_high_low_average": "Drop high/low, average rest",
     "normalized_100": "Normalize each heat to 100",
 }
 
 
 def normalize_result_mode(value: str | None) -> str:
-    return value if value in RESULT_MODE_LABELS else "total_of_all_runs"
+    clean = str(value or "").strip()
+    if clean == "total_of_all_runs":
+        return clean
+    match = re.fullmatch(r"best_(\d+)_heats?", clean)
+    if match:
+        count = max(1, min(50, int(match.group(1))))
+        return f"best_{count}_heat" if count == 1 else f"best_{count}_heats"
+    return "total_of_all_runs"
 
 
 def normalize_score_aggregation_mode(value: str | None) -> str:
@@ -29,7 +37,12 @@ def normalize_score_aggregation_mode(value: str | None) -> str:
 
 
 def result_mode_label(value: str | None) -> str:
-    return RESULT_MODE_LABELS[normalize_result_mode(value)]
+    mode = normalize_result_mode(value)
+    count = best_heat_count(mode)
+    if count is not None:
+        noun = "heat" if count == 1 else "heats"
+        return f"Best {count} {noun}"
+    return RESULT_MODE_LABELS[mode]
 
 
 def score_aggregation_label(value: str | None) -> str:
@@ -38,10 +51,9 @@ def score_aggregation_label(value: str | None) -> str:
 
 def best_heat_count(value: str | None) -> int | None:
     mode = normalize_result_mode(value)
-    if mode.startswith("best_") and mode.endswith("_heat"):
-        return int(mode.split("_")[1])
-    if mode.startswith("best_") and mode.endswith("_heats"):
-        return int(mode.split("_")[1])
+    match = re.fullmatch(r"best_(\d+)_heats?", mode)
+    if match:
+        return int(match.group(1))
     return None
 
 
@@ -73,6 +85,25 @@ def max_single_judge_score(db: Session, event_id: int) -> float:
     return sum(criterion_max_points(item) for item in criteria)
 
 
+def aggregate_judge_totals(values: list[float], aggregation_mode: str, max_score: float) -> float | None:
+    if not values:
+        return None
+    if aggregation_mode == "sum_all_judges":
+        total = sum(values)
+    elif aggregation_mode == "median_judge_score":
+        total = float(median(values))
+    elif aggregation_mode == "drop_high_low_average":
+        kept = sorted(values)
+        if len(kept) >= 3:
+            kept = kept[1:-1]
+        total = sum(kept) / len(kept)
+    else:
+        total = sum(values) / len(values)
+    if aggregation_mode == "normalized_100" and max_score > 0:
+        total = (total / max_score) * 100
+    return total
+
+
 def competitor_scoreboard(
     db: Session,
     event_id: int,
@@ -84,37 +115,28 @@ def competitor_scoreboard(
     mode = normalize_result_mode(result_mode)
     aggregation_mode = normalize_score_aggregation_mode(score_aggregation_mode)
     best_count = best_heat_count(mode)
-    aggregate_expr = func.sum(ScoreEntry.total)
-    if aggregation_mode in {"average_judge_score", "normalized_100"}:
-        aggregate_expr = func.avg(ScoreEntry.total)
     max_score = max_single_judge_score(db, event_id) if aggregation_mode == "normalized_100" else 0.0
-    score_conditions = [
-        ScoreEntry.run_id == Run.id,
-        ScoreEntry.event_id == event_id,
-        ScoreEntry.status == "submitted",
-        ScoreEntry.active_for_results.is_(True),
-    ]
+    score_conditions = [ScoreEntry.event_id == event_id, ScoreEntry.status == "submitted", ScoreEntry.active_for_results.is_(True)]
     if submitted_before:
         score_conditions.append(func.coalesce(ScoreEntry.submitted_at, ScoreEntry.created_at) <= submitted_before)
-    rows = db.execute(
-        select(
-            Run,
-            func.coalesce(aggregate_expr, 0).label("total"),
-            func.count(ScoreEntry.id).label("score_count"),
-        )
-        .outerjoin(ScoreEntry, and_(*score_conditions))
+    score_rows = db.execute(
+        select(ScoreEntry.run_id, ScoreEntry.total).where(*score_conditions, ScoreEntry.total.is_not(None))
+    ).all()
+    scores_by_run: dict[int, list[float]] = {}
+    for run_id, total in score_rows:
+        scores_by_run.setdefault(run_id, []).append(float(total or 0))
+    runs = db.scalars(
+        select(Run)
         .where(Run.event_id == event_id, Run.include_in_results.is_(True))
-        .group_by(Run.id)
         .order_by(Run.queue_position, Run.id)
     ).all()
 
     competitors: dict[int, dict] = {}
     by_run_id: dict[int, dict] = {}
-    for run, raw_total, raw_score_count in rows:
-        score_count = int(raw_score_count or 0)
-        run_total = float(raw_total or 0) if score_count else None
-        if aggregation_mode == "normalized_100" and run_total is not None and max_score > 0:
-            run_total = (run_total / max_score) * 100
+    for run in runs:
+        score_values = scores_by_run.get(run.id, [])
+        score_count = len(score_values)
+        run_total = aggregate_judge_totals(score_values, aggregation_mode, max_score)
         by_run_id[run.id] = {
             "run_total": score_value(run_total),
             "score_count": score_count,

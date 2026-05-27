@@ -1704,6 +1704,23 @@ label {
   font-weight: 500;
 }
 
+.inline-number-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.inline-number-control input {
+  width: 72px;
+  min-height: 34px;
+  text-align: center;
+  font-weight: 900;
+}
+
 .settings-about-line {
   display: flex;
   align-items: center;
@@ -1751,6 +1768,11 @@ label {
 .mini-field input {
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+#criteria-list {
+  display: grid;
+  gap: 10px;
 }
 
 .criterion-card {

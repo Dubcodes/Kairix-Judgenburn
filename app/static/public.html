@@ -12,7 +12,7 @@
       <div class="topline public-topline">
         <div class="brand-block">
           <div class="brand-row">
-            <img class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
+            <img id="public-logo" class="brand-logo" src="/static/kairix-judging-system-logo.png" alt="Kairix logo">
             <div>
               <div id="public-event-name" class="brand">Public Display</div>
               <div id="public-event-meta" class="muted">Loading event</div>
@@ -99,6 +99,20 @@
         const heat = latestState?.settings?.result_mode_label || "All heats";
         const aggregate = latestState?.settings?.score_aggregation_label || "Add all judge totals";
         return aggregate === "Add all judge totals" ? heat : `${heat} / ${aggregate}`;
+      }
+
+      function publicDisplayConfig() {
+        return latestState?.settings?.public_display || {};
+      }
+
+      function applyPublicBranding() {
+        const config = publicDisplayConfig();
+        const logo = document.getElementById("public-logo");
+        const nextLogo = String(config.logo_url || "/static/kairix-judging-system-logo.png").trim();
+        if (nextLogo && logo.getAttribute("src") !== nextLogo) logo.setAttribute("src", nextLogo);
+        const event = latestState?.event || {};
+        document.getElementById("public-event-name").textContent = config.heading || event.name || "Public Display";
+        document.getElementById("public-event-meta").textContent = [event.venue, event.event_date].filter(Boolean).join(" / ") || "Live event";
       }
 
       function runMeta(run) {
@@ -298,9 +312,7 @@
           shell.innerHTML = `<section class="public-panel"><h2>Loading</h2><p class="muted">Waiting for event data.</p></section>`;
           return;
         }
-        const event = latestState.event || {};
-        document.getElementById("public-event-name").textContent = event.name || "Public Display";
-        document.getElementById("public-event-meta").textContent = [event.venue, event.event_date].filter(Boolean).join(" / ") || "Live event";
+        applyPublicBranding();
         const notice = String(latestState.settings?.public_notice || "").trim();
         document.getElementById("public-notice-card").style.display = notice ? "grid" : "none";
         document.getElementById("public-notice-text").textContent = notice;
