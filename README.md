@@ -41,19 +41,20 @@ Default local URLs:
 - OBS overlay: `http://localhost:7080/obs-overlay`
 - Competitor queue: `http://localhost:7080/queue`
 - Public display: `http://localhost:7080/public`
+- Isolated public display container: `http://localhost:7081/`
 - Recovery page: `http://localhost:7080/recovery`
 
-Optional isolated public display container:
-
-```bash
-docker compose --profile public up -d public
-```
-
-That serves only the public display and queue pages on `http://localhost:7081/`, proxying the safe `/api/public/snapshot` from the main app. For a cloud-hosted public display, deploy the same image with the command `uvicorn app.public_app:app --host 0.0.0.0 --port 8080 --proxy-headers` and set `PUBLIC_UPSTREAM_URL` to the main judging server URL.
+The isolated public display service starts with the main stack. It serves only the public display and queue pages on `http://localhost:7081/`, proxying the safe `/api/public/snapshot` from the main app. For a cloud-hosted public display, deploy the same image with the command `uvicorn app.public_app:app --host 0.0.0.0 --port 8080 --proxy-headers` and set `PUBLIC_UPSTREAM_URL` to the main judging server URL.
 
 ## Portainer Git Deployment
 
-Use Portainer's Git repository stack option and point it at this repository. Set the compose path to:
+Use Portainer's Git repository stack option and point it at this repository. The default compose file now works for Portainer Git deployment:
+
+```text
+docker-compose.yml
+```
+
+The dedicated Portainer compose is kept in sync and can also be used:
 
 ```text
 docker-compose.portainer.yml

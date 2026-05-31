@@ -15,6 +15,7 @@ services:
 
   web:
     build: .
+    image: kairix-judgenburn-web:local
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-kairix}:${POSTGRES_PASSWORD:-kairix_dev_password}@db:5432/${POSTGRES_DB:-kairix_judging}
       APP_NAME: ${APP_NAME:-Kairix Judgenburn}
@@ -27,12 +28,12 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./app:/app/app
-      - ./backups:/app/backups
+      - backups_data:/app/backups
     restart: unless-stopped
 
   public:
     build: .
+    image: judgenburn-public-display:local
     command: uvicorn app.public_app:app --host 0.0.0.0 --port 8080 --proxy-headers
     environment:
       PUBLIC_UPSTREAM_URL: ${PUBLIC_UPSTREAM_URL:-http://web:8080}
@@ -41,8 +42,6 @@ services:
       - "${PUBLIC_PORT:-7081}:8080"
     depends_on:
       - web
-    profiles:
-      - public
     restart: unless-stopped
 
   tunnel:
@@ -57,3 +56,4 @@ services:
 
 volumes:
   postgres_data:
+  backups_data:
